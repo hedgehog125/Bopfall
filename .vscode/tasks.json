@@ -1,0 +1,60 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build static",
+			"options": {
+				"cwd": "${workspaceFolder}/static/"
+			},
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Dev static",
+			"options": {
+				"cwd": "${workspaceFolder}/static/"
+			},
+			"command": "npm",
+			"args": [
+				"run",
+				"dev"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Start backend",
+			"options": {
+				"cwd": "${workspaceFolder}/server/"
+			},
+			"command": "node",
+			"args": [
+				"index.js"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Gzip last build",
+			"options": {
+				"cwd": "${workspaceFolder}/gzipTool/"
+			},
+			"command": "node",
+			"args": [
+				"gzip.js"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Install dependencies",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"command": "./devInstall.sh",
+			"args": [],
+			"problemMatcher": []
+		}
+	]
+}

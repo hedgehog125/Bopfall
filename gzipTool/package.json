@@ -1,0 +1,17 @@
+{
+  "name": "gzip-script",
+  "version": "1.0.0",
+  "description": "A very simple custom script for gzipping all the files in a folder",
+  "main": "gzip.js",
+  "dependencies": {
+    "node-gzip": "^1.1.2",
+    "sandboxed-path": "^1.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Nicholas Clack (Hedgehog125)",
+  "license": "GNU GPL v3"
+}
