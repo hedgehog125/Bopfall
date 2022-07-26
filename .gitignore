@@ -1,4 +1,5 @@
 # Specific to this program
+keys.json
 
 # From sveltekit gitignore
 .DS_Store
