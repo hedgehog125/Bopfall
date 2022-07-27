@@ -8,6 +8,8 @@ module.exports.init = async config => {
 		keyFilename: "keys.json"
 	});
 	bucket = storage.bucket(config.bucket);
+
+	await new Promise(res => {setTimeout(_ => {res()}, 10000)});
 };
 
 module.exports.exists = async path => (await bucket.file(path).exists())[0];

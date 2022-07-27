@@ -20,18 +20,34 @@ const fs = moreFS.promises;
 const ipPackage = require("ip");
 const IP = ipPackage.address();
 
+class ExposedPromise {
+	constructor() {
+		let resolve;
+		let promise = new Promise(res => {
+			resolve = res;
+		});
+		promise.resolve = resolve;
+
+		Object.assign(this, promise);
+	}
+}
+
 const express = require("express");
 const cors = require("cors");
 const app = express();
 
 const state = {
-	started: false
+	started: false,
+	error: false
+};
+const tasks = {
+	fullStart: new ExposedPromise()
 };
 let config = {
 	storage: JSON.parse(process.env.STORAGE)
 };
 let storage; // Is set when the storage module is started
-const PORT = process.env.PORT?? 8001; // Loaded as part of config or from the environment variable
+const PORT = process.env.PORT?? 8000; // Loaded as part of config or from the environment variable
 
 const loadConfig = async _ => {
 	config = JSON.parse(await fs.readFile(path.accessLocal("config.json")));
@@ -69,7 +85,7 @@ const startStorageModule = async _ => {
 			throw new Error("Invalid JSON in the info.json file (in the dynamic storage).");
 		}
 		if (info.type != "Bopfall") {
-			throw new Error(`The dynamic storage seems to be being used by something else. info.json contains:\n${text}`);
+			throw new Error(`The dynamic storage seems to be being used by something else. info.json contains:\n\n${text}`);
 		}
 	}
 	else {
@@ -81,20 +97,30 @@ const startStorageModule = async _ => {
 
 const startServer = {
 	basic: _ => {
-		// TODO: options
-		app.use("/info", cors("*")); // Due to the CORS details being stored in the rest of the storage, this has to be allowed for all sites. But it doesn't give really any info so it's fine
+		// Due to the CORS details being stored in the rest of the storage, these 2 have to be allowed for all sites. But it doesn't give really any info so it's fine
+		app.use("/info", cors("*"));
 		app.get("/info", (req, res) => {
 			res.json({
 				type: "Bopfall",
 				status: state.started? "ready" : "starting"
 			});
 		});
+		app.use("/waitUntilStart", cors("*"));
+		app.get("/waitUntilStart", async (req, res) => {
+			await tasks.fullStart;
+			if (state.error) {
+				res.status(500).send();
+			}
+			else {
+				res.send();
+			}
+		});
 	
 		let startTime = (performance.now() - startTimestamp) / 1000;
 		app.listen(PORT, _ => {
 			console.log(
 				`Bopfall has basic started and is running on port ${PORT} using IP ${IP} in ${Math.round(startTime * 100) / 100}s.
-		
+
 	For access on the same machine: http://localhost:${PORT}/
 	And for other devices on your LAN: http://${IP}:${PORT}/
 	`
@@ -102,16 +128,25 @@ const startServer = {
 		});
 	},
 	full: async _ => {
-		await startStorageModule();
+		try {
+			await startStorageModule();
+		}
+		catch (error) {
+			state.error = true;
+			throw new Error(error);
+		}
 	}
 }
 
 const start = async _ => {
 	startServer.basic();
 	await startServer.full();
-	
 	state.started = true;
-	let startTime = (performance.now() - startTimestamp) / 1000;
-	console.log(`Fully started in ${Math.round(startTime * 100) / 100}s.\n`);
+	tasks.fullStart.resolve();
+
+	if (! state.error) {
+		let startTime = (performance.now() - startTimestamp) / 1000;
+		console.log(`Fully started in ${Math.round(startTime * 100) / 100}s.\n`);
+	}
 };
 start();
