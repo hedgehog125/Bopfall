@@ -20,17 +20,14 @@ const fs = moreFS.promises;
 const ipPackage = require("ip");
 const IP = ipPackage.address();
 
-class ExposedPromise {
-	constructor() {
-		let resolve;
-		let promise = new Promise(res => {
-			resolve = res;
-		});
-		promise.resolve = resolve;
-
-		Object.assign(this, promise);
-	}
-}
+const makeExposedPromise = _ => {
+	let resolve;
+	let promise = new Promise(res => {
+		resolve = res;
+	});
+	promise.resolve = resolve;
+	return promise;
+};
 
 const express = require("express");
 const cors = require("cors");
@@ -41,7 +38,7 @@ const state = {
 	error: false
 };
 const tasks = {
-	fullStart: new ExposedPromise()
+	fullStart: makeExposedPromise()
 };
 let config = {
 	storage: JSON.parse(process.env.STORAGE)

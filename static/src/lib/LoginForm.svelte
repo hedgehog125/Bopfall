@@ -1,13 +1,13 @@
 <script>
+	import { response } from "$util/Tools.js";
+
 	import MobileNewLine from "$util/MobileNewLine.svelte";
-	import { response, ui } from "$util/Tools.js";
-import { debug } from "svelte/internal";
+	import SmoothVisible from "$util/SmoothVisible.svelte";
 
 	export let handleLogin;
 
-	const DISPLAY_AFTER = 100;
-	const MIN_CONNECT_TIME = 750;
-	const smoothedConnectVisible = ui.smoothVisible(DISPLAY_AFTER, MIN_CONNECT_TIME);
+	let smoothedConnectVisible;
+	$: connectVisible = domainCheckStatus == "checking";
 
 	let domain;
 	let password;
@@ -76,10 +76,6 @@ import { debug } from "svelte/internal";
 			}
 		}
 
-		await new Promise(resolve => {setTimeout(_ => {
-			resolve();
-		}, 5000)});
-
 		domainCheckStatus = "ok";
 	};
 
@@ -110,10 +106,12 @@ import { debug } from "svelte/internal";
 			Now enter your password...
 		{/if}
 	</h2>
-	{#if smoothedConnectVisible(domainCheckStatus == "checking", smoothedConnectVisible.rerender)}
+
+	<SmoothVisible input={connectVisible} bind:output={smoothedConnectVisible}></SmoothVisible>
+	{#if smoothedConnectVisible}
 		<div>
 			<p>
-				{connectionSteps[connectionStep]} ({connectionStep + 1}/2)
+				{connectionSteps[connectionStep]}... ({connectionStep + 1}/2)
 			</p>
 		</div>
 	{/if}
