@@ -2,6 +2,7 @@
 TODO
 
 Register network event listener, display message when offline and disable some things
+Prevent slashes on the end of client domains
 = Security =
 Handle CORS in a safe but functional way when the config hasn't yet been loaded. Maybe don't register most endpoints or register them with default CORS initially? Maybe return early with HTTP error if not fully started, possibly could be narrow timing window due to the preflight
 */
@@ -31,7 +32,7 @@ const makeExposedPromise = _ => {
 };
 
 const express = require("express");
-const cors = require("cors");
+const corsAndAuth = require("./src/corsAndAuth.js");
 const { exit } = require("process");
 const app = express();
 
@@ -40,7 +41,8 @@ const state = {
 	startError: false,
 
 	persistent: {
-		passwordSet: null
+		passwordSet: null,
+		initialConfigDone: null
 	}
 };
 const tasks = {
@@ -102,52 +104,32 @@ const startStorageModule = async _ => {
 
 const startServer = {
 	basic: _ => {
-		const defaultRoute = { // TODO: Use a middleware?
-			get: (path, fn, startupRoute) => {
-				defaultRoute.internal.main("get", path, fn, startupRoute);
-			},
-			post: (path, fn, startupRoute) => {
-				defaultRoute.internal.main("post", path, fn, startupRoute);
-			},
-			internal: {
-				main: (httpMethod, path, fn, startupRoute = false) => {
-					const corsPolicy = async (req, callback) => {
-						await tasks.fullStart;
-						const origin = req.headers.origin;
-		
-						console.log(config.clientDomains, origin)
-						if (config.clientDomains[origin] || ! origin) {
-							callback(null, {
-								origin
-							});
-						}
-						else {
-							callback(null, {
-								origin: false // TODO
-							});
-						}
-					};
-
-					if (startupRoute) {
-						app.use(path, cors("*"));
-					}
-					else {
-						app.use(path, cors(corsPolicy));
-					}
-
-					app[httpMethod](path, fn); // The cors policy will already make the function wait until everything's started
-				}
-			}
-		};
+		app.use(corsAndAuth.middleware({
+			wildcardCorsRoutes: [
+				"/info",
+				"/waitUntilStart"
+			],
+			initialConfigRoutes: [ // All client domains for these requests are treated as trusted (instead of just CORS wildcard) during some of the initial config, as CORS isn't configured yet
+				"/auth/initial",
+				"/config/set/clientDomains"
+			],
+			noAuthRoutes: [
+				"/info",
+				"/waitUntilStart",
+				"/info/passwordSet",
+				"/auth"
+			],
+			mainConfig: config
+		}, tasks.fullStart));
 
 		// Due to the CORS details being stored in the rest of the storage, these 2 have to be allowed for all sites. But it doesn't give really any info so it's fine
-		defaultRoute.get("/info", (req, res) => {
+		app.get("/info", (req, res) => {
 			res.json({
 				type: "Bopfall",
 				status: state.startError? "error" : (state.started? "ready" : "starting")
 			});
-		}, true);
-		defaultRoute.get("/waitUntilStart", async (req, res) => {
+		});
+		app.get("/waitUntilStart", async (req, res) => {
 			await tasks.anyFullStartResult;
 			if (state.startError) {
 				res.status(500).send();
@@ -155,9 +137,9 @@ const startServer = {
 			else {
 				res.send();
 			}
-		}, true);
+		});
 
-		defaultRoute.get("/info/passwordSet", (req, res) => {
+		app.get("/info/passwordSet", (req, res) => {
 			res.send(state.persistent.passwordSet.toString());
 		});
 	
@@ -183,8 +165,7 @@ const startServer = {
 		}
 
 		// TODO
-		config.clientDomains = {
-		};
+		config.clientDomains = ["http://127.0.0.1:5173"];
 		state.persistent.passwordSet = false;
 	}
 }

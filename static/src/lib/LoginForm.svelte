@@ -18,6 +18,7 @@
 		"Waiting for the server to start"
 	];
 	let checkServerStatus, checkServerTask;
+	let displayAsSetupCode = false;
 
 	const handleLogin = async _ => {
 		if (step == 1) {
@@ -84,6 +85,18 @@
 		}
 
 		checkServerStatus = "ok";
+
+		try {
+			res = await fetch(`${url}/info/passwordSet`);
+		}
+		catch (error) {
+			displayError(0);
+			return;
+		}
+		if (res.ok) {
+			res = await res.text();
+			displayAsSetupCode = res === "false";
+		}
 	};
 
 	const displayError = async code => {
@@ -116,7 +129,11 @@
 		{#if step == 0}
 			Enter the domain of your server...
 		{:else}
-			Now enter your password...
+			{#if displayAsSetupCode}
+				Now enter your setup code...
+			{:else}
+				Now enter your password...
+			{/if}
 		{/if}
 	</h2>
 
@@ -132,7 +149,11 @@
 		{#if step == 0}
 			<input type="text" bind:value={domain} aria-label="The domain name to connect to" placeholder="Enter a domain..." name="username" autocomplete="username">
 		{:else}
-			<input type="password" bind:value={password} aria-label="Your password" placeholder="Enter your password..." name="password" autocomplete="current-password">
+			{#if displayAsSetupCode}
+				<input type="text" bind:value={password} aria-label="Your setup code" placeholder="Enter your setup code..." autocomplete="one-time-code">
+			{:else}
+				<input type="password" bind:value={password} aria-label="Your password" placeholder="Enter your password..." name="password" autocomplete="current-password">
+			{/if}
 		{/if}
 		<MobileNewLine></MobileNewLine>
 		<button type="submit">{step == 0? "Next" : "Connect"}</button>
