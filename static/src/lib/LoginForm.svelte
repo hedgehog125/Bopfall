@@ -1,13 +1,13 @@
 <script>
-	import { response } from "$util/Tools.js";
+	import { response, connection } from "$util/Tools.js";
 
 	import MobileNewLine from "$util/MobileNewLine.svelte";
 	import SmoothVisible from "$util/SmoothVisible.svelte";
 
-	export let handleLogin;
+	export let onLoginSuccess;
 
 	let smoothedConnectVisible;
-	$: connectVisible = domainCheckStatus == "checking";
+	$: connectVisible = checkServerStatus == "checking";
 
 	let domain;
 	let password;
@@ -17,28 +17,33 @@
 		"Pinging server",
 		"Waiting for the server to start"
 	];
-	let domainCheckStatus;
+	let checkServerStatus, checkServerTask;
 
-	const handleLoginInternal = _ => {
+	const handleLogin = async _ => {
 		if (step == 1) {
-			//handleLogin();
+			await checkServerTask;
+			if (step != 1 || checkServerStatus != "ok") return;
+			
+			if (! await authenticate(domain, password)) return;
+
+			onLoginSuccess();
 		}
 		else {
-			checkServer();
 			step = 1;
+			checkServerTask = checkServer();
 		}
 	};
 
 	const checkServer = async _ => {
 		let url = domain.includes("://")? domain : "https://" + domain;
 
-		domainCheckStatus = "checking";
+		checkServerStatus = "checking";
 		connectionStep = 0;
 		let res;
 		try {
 			res = await fetch(`${url}/info`);
 		}
-		catch (error) {
+		catch {
 			displayError(0);
 			return;
 		}
@@ -58,43 +63,51 @@
 			displayError(1);
 			return;
 		}
+		if (res.status == "error") {
+			displayError(2);
+			return;
+		}
 
 		connectionStep = 1;
 
-		res = null;
 		try {
 			res = await fetch(`${url}/waitUntilStart`);
 		}
-		catch {
+		catch (error) {
 			displayError(0);
 			return;
 		}
-		if (res) {
-			if (res.status != 200) {
-				displayError(2);
-				return;
-			}
+		if (res.ok) res.text(); // It makes it look like an error in the console if we don't call one of the methods
+		else {
+			displayError(2);
+			return;
 		}
 
-		domainCheckStatus = "ok";
+		checkServerStatus = "ok";
 	};
 
-	const displayError = code => {
-		debugger;
-		domainCheckStatus = "invalid";
-		if (code == 0) { // No connection, use a popup instead of going back in the form
-
+	const displayError = async code => {
+		checkServerStatus = "invalid";
+		if (code == 0) { // No connection or an invalid domain
+			if (! (await connection.check())) return; // Don't go back if it's just a connection issue
 		}
 		else if (code == 1) { // Invalid server response, not Bopfall server
 
 		}
 		else if (code == 2) { // Server failed to properly start
-
+			
+		}
+		else if (code == 3) { // Invalid login
+			password = "";
+			return; // Only clear the password as that's probably what's wrong
 		}
 
-		if (code != 0) {
+		step = 0;
+		domain = "";
+	};
 
-		}
+	const authenticate = async (domain, password) => {
+
 	};
 </script>
 
@@ -115,20 +128,20 @@
 			</p>
 		</div>
 	{/if}
-	<form on:submit|preventDefault={handleLoginInternal}>
+	<form on:submit|preventDefault={handleLogin}>
 		{#if step == 0}
 			<input type="text" bind:value={domain} aria-label="The domain name to connect to" placeholder="Enter a domain..." name="username" autocomplete="username">
 		{:else}
 			<input type="password" bind:value={password} aria-label="Your password" placeholder="Enter your password..." name="password" autocomplete="current-password">
 		{/if}
 		<MobileNewLine></MobileNewLine>
-		<button type="submit" disabled={step == 1 && domainCheckStatus != "ok"}>{step == 0? "Next" : "Connect"}</button>
+		<button type="submit">{step == 0? "Next" : "Connect"}</button>
 	</form>
 </main>
 
 <style>
 	div {
-		border-top: 5px dotted #EFEFEF;
-		border-bottom: 5px dotted #EFEFEF;
+		border-top: 2px dotted #EFEFEF;
+		border-bottom: 2px dotted #EFEFEF;
 	}
 </style>

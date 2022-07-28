@@ -1,6 +1,7 @@
 /*
 TODO
 
+Register network event listener, display message when offline and disable some things
 = Security =
 Handle CORS in a safe but functional way when the config hasn't yet been loaded. Maybe don't register most endpoints or register them with default CORS initially? Maybe return early with HTTP error if not fully started, possibly could be narrow timing window due to the preflight
 */
@@ -31,17 +32,24 @@ const makeExposedPromise = _ => {
 
 const express = require("express");
 const cors = require("cors");
+const { exit } = require("process");
 const app = express();
 
 const state = {
 	started: false,
-	error: false
+	startError: false,
+
+	persistent: {
+		passwordSet: null
+	}
 };
 const tasks = {
-	fullStart: makeExposedPromise()
+	fullStart: makeExposedPromise(),
+	anyFullStartResult: makeExposedPromise()
 };
 let config = {
-	storage: JSON.parse(process.env.STORAGE)
+	storage: JSON.parse(process.env.STORAGE),
+	clientDomains: null
 };
 let storage; // Is set when the storage module is started
 const PORT = process.env.PORT?? 8000; // Loaded as part of config or from the environment variable
@@ -94,23 +102,63 @@ const startStorageModule = async _ => {
 
 const startServer = {
 	basic: _ => {
+		const defaultRoute = { // TODO: Use a middleware?
+			get: (path, fn, startupRoute) => {
+				defaultRoute.internal.main("get", path, fn, startupRoute);
+			},
+			post: (path, fn, startupRoute) => {
+				defaultRoute.internal.main("post", path, fn, startupRoute);
+			},
+			internal: {
+				main: (httpMethod, path, fn, startupRoute = false) => {
+					const corsPolicy = async (req, callback) => {
+						await tasks.fullStart;
+						const origin = req.headers.origin;
+		
+						console.log(config.clientDomains, origin)
+						if (config.clientDomains[origin] || ! origin) {
+							callback(null, {
+								origin
+							});
+						}
+						else {
+							callback(null, {
+								origin: false // TODO
+							});
+						}
+					};
+
+					if (startupRoute) {
+						app.use(path, cors("*"));
+					}
+					else {
+						app.use(path, cors(corsPolicy));
+					}
+
+					app[httpMethod](path, fn); // The cors policy will already make the function wait until everything's started
+				}
+			}
+		};
+
 		// Due to the CORS details being stored in the rest of the storage, these 2 have to be allowed for all sites. But it doesn't give really any info so it's fine
-		app.use("/info", cors("*"));
-		app.get("/info", (req, res) => {
+		defaultRoute.get("/info", (req, res) => {
 			res.json({
 				type: "Bopfall",
-				status: state.started? "ready" : "starting"
+				status: state.startError? "error" : (state.started? "ready" : "starting")
 			});
-		});
-		app.use("/waitUntilStart", cors("*"));
-		app.get("/waitUntilStart", async (req, res) => {
-			await tasks.fullStart;
-			if (state.error) {
+		}, true);
+		defaultRoute.get("/waitUntilStart", async (req, res) => {
+			await tasks.anyFullStartResult;
+			if (state.startError) {
 				res.status(500).send();
 			}
 			else {
 				res.send();
 			}
+		}, true);
+
+		defaultRoute.get("/info/passwordSet", (req, res) => {
+			res.send(state.persistent.passwordSet.toString());
 		});
 	
 		let startTime = (performance.now() - startTimestamp) / 1000;
@@ -129,21 +177,35 @@ const startServer = {
 			await startStorageModule();
 		}
 		catch (error) {
-			state.error = true;
-			throw new Error(error);
+			state.startError = true;
+			console.error(error);
+			return;
 		}
+
+		// TODO
+		config.clientDomains = {
+		};
+		state.persistent.passwordSet = false;
 	}
 }
 
 const start = async _ => {
 	startServer.basic();
 	await startServer.full();
+	
+	tasks.anyFullStartResult.resolve();
+	if (state.startError) {
+		console.log("\nWill stop in a second due to a startup error...\n");
+		setTimeout(_ => { // Wait a second before stopping so clients can know there was an error
+			exit(1);
+		}, 1000);
+		return;
+	}
+
 	state.started = true;
 	tasks.fullStart.resolve();
 
-	if (! state.error) {
-		let startTime = (performance.now() - startTimestamp) / 1000;
-		console.log(`Fully started in ${Math.round(startTime * 100) / 100}s.\n`);
-	}
+	let startTime = (performance.now() - startTimestamp) / 1000;
+	console.log(`Fully started in ${Math.round(startTime * 100) / 100}s.\n`);
 };
 start();

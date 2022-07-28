@@ -1,3 +1,6 @@
+import linkPage from "$util/LinkPage.js";
+import { dev } from "$app/env";
+
 export const format = {
 	time: (total, count = 3) => {
 		let hours = Math.floor(total / (60 * 60));
@@ -29,5 +32,19 @@ export const response = {
 		const typeHeader = res.headers.get("content-type");
 		if (typeHeader == null) return "";
 		else return typeHeader.split(";")[0];
+	}
+};
+export const connection = {
+	check: async _ => {
+		if (! navigator.onLine) return false;
+		if (dev) return true;
+
+		try {
+			await fetch(linkPage("ping"));
+		}
+		catch {
+			return false;
+		}
+		return true;
 	}
 };
