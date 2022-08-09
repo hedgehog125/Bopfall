@@ -28,9 +28,15 @@
 		"GCS": {
 			"script": "GCS.js",
 			"args": {
-				"project": "common.project"
+				"project": "common.project",
+				"bucket": "common.bucket"
 			},
 			"englishName": "Google Cloud Storage"
+		},
+		"Local": {
+			"script": "Local.js",
+			"args": {},
+			"englishName": "Local filesystem"
 		}
 	}
 }
