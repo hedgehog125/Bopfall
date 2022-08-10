@@ -43,8 +43,9 @@ module.exports.middleware = (config, fullStart, state) => {
 	};
 
 	fullStart.then(_ => {
-		clientDomains = indexArray(config.mainConfig.clientDomains);
-		clientDomainsConfigured = config.mainConfig.clientDomains.length != 0;
+		let mainConfig = config.mainConfig.main;
+		clientDomains = indexArray(mainConfig.clientDomains);
+		clientDomainsConfigured = mainConfig.clientDomains.length != 0;
 	});
 
 	return async (req, res, next) => {

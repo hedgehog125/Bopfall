@@ -1,6 +1,6 @@
 // This module is more complicated than you might expect because it has to recreate a flat file system that also supports any name. Unlike a normal filesystem
 
-const path = require("sandboxed-path");
+const path = require("sandboxed-path"); // Annoyingly, this is shared with the main file
 const moreFS = require("fs");
 const fs = moreFS.promises;
 
@@ -27,16 +27,14 @@ module.exports = {
 				await fs.mkdir(path.accessLocal("storage"));
 			}
 		}
-		path.changeSandboxScope.setRelative("storage");
-		path.changeRelativeBasePath.matchSandbox();
 
 		{
 			let isFile;
 			try {
-				isFile = (await fs.stat(path.accessLocal(".fileIndex.sjon"))).isFile();
+				isFile = (await fs.stat(path.accessLocal("storage/.fileIndex.sjon"))).isFile();
 			}
 			catch {
-				await fs.writeFile(path.accessLocal(".fileIndex.json"), "{}");
+				await fs.writeFile(path.accessLocal("storage/.fileIndex.json"), "{}");
 				fileIndex = new Map();
 				indexUpdated = true;
 				isFile = true;
@@ -51,7 +49,7 @@ module.exports = {
 			fileIndex = new Map(
 				Object.entries(
 					JSON.parse(
-						await fs.readFile(path.accessLocal(".fileIndex.json"))
+						await fs.readFile(path.accessLocal("storage/.fileIndex.json"))
 					)
 				)
 			);
@@ -67,7 +65,7 @@ module.exports = {
 		}
 		if (storedPath == null) storedPath = fileIndex.get(filePath);
 
-		await fs.writeFile(path.accessLocal(storedPath), data);
+		await fs.writeFile(path.accessLocal("storage/" + storedPath), data);
 	},
 	
 	readFile: async filePath => {
@@ -75,7 +73,7 @@ module.exports = {
 			throw new Error("The file does not exist.");
 		}
 
-		return await fs.readFile(path.accessLocal(fileIndex[filePath]));
+		return await fs.readFile(path.accessLocal("storage/" + fileIndex[filePath]));
 	},
 	
 	rename: async (filePath, newName) => {
@@ -98,7 +96,7 @@ const saveIndex = async _ => {
 	if (! indexUpdated) return;
 	
 	await fs.writeFile(
-		path.accessLocal(".fileIndex.json"),
+		path.accessLocal("storage/.fileIndex.json"),
 
 		JSON.stringify(
 			Object.fromEntries(

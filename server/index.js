@@ -3,6 +3,10 @@ TODO
 
 Register network event listener, display message when offline and disable some things
 Prevent slashes on the end of client domains
+
+= Tweaks =
+Tidy up Local.js by using the load JSON function
+
 = Security =
 Handle CORS in a safe but functional way when the config hasn't yet been loaded. Maybe don't register most endpoints or register them with default CORS initially? Maybe return early with HTTP error if not fully started, possibly could be narrow timing window due to the preflight
 */
@@ -30,6 +34,28 @@ const makeExposedPromise = _ => {
 	promise.resolve = resolve;
 	return promise;
 };
+const loadJSONOrDefault = async (filePath, defaultValuePath=filePath) => {
+	if (! (await storage.exists(filePath))) {
+		let loadedData = JSON.parse(
+			await fs.readFile(
+				path.accessLocal(
+					"default/" + defaultValuePath
+				)
+			)
+		);
+		await storage.writeFile(filePath, JSON.stringify(loadedData));
+		return loadedData;
+	}
+
+	try {
+		return JSON.parse(
+			await storage.readFile(filePath)
+		);
+	}
+	catch {
+		throw new Error(`Invalid JSON in the ${filePath} file (in the dynamic storage).`);
+	}
+};
 
 const express = require("express");
 const corsAndAuth = require("./src/corsAndAuth.js");
@@ -41,24 +67,25 @@ const state = {
 	started: false,
 	startError: false,
 
-	persistent: {
-		passwordSet: null,
-		initialConfigDone: null
-	}
+	persistent: null
 };
 const tasks = {
 	fullStart: makeExposedPromise(),
 	anyFullStartResult: makeExposedPromise()
 };
+
 let config = {
-	storage: JSON.parse(process.env.STORAGE),
-	clientDomains: null
+	storage: JSON.parse(process.env.STORAGE)
 };
 let storage; // Is set when the storage module is started
-const PORT = process.env.PORT?? 8000; // Loaded as part of config or from the environment variable
+let info;
 
-const loadConfig = async _ => {
-	config = JSON.parse(await fs.readFile(path.accessLocal("config.json")));
+const PORT = process.env.PORT?? 8000; // Loaded as part of config or from the environment variable
+const LATEST_VERSIONS = {
+	info: 1,
+	db: 1,
+	config: 1,
+	persistentState: 1
 };
 
 const startServer = {
@@ -123,12 +150,15 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 			return;
 		}
 
-		// TODO
-		config.clientDomains = ["http://127.0.0.1:5173"];
-		state.persistent.passwordSet = false;
-		config.commitDelay = 30;
+		{
+			const load = startServer.load;
+			await load.info();
+			await load.config();
+			await load.persistentState();
+		}
+		console.log(state, config, info);
 
-		setInterval(periodicCommit, config.commitDelay * 1000);
+		setInterval(periodicCommit, config.main.commitInterval);
 	},
 
 	storageModule: async _ => {
@@ -152,24 +182,20 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 			const output = storage.init(config.storage, storageModuleData);
 			if (output instanceof Promise) await output;
 		}
-	
-		if (await storage.exists("info.json")) {
-			const text = await storage.readFile("info.json");
-			let info;
-			try {
-				info = JSON.parse(text);
-			}
-			catch {
-				throw new Error("Invalid JSON in the info.json file (in the dynamic storage).");
-			}
+	},
+	load: {
+		info: async _ => {
+			info = await loadJSONOrDefault("info.json");
 			if (info.type != "Bopfall") {
-				throw new Error(`The dynamic storage seems to be being used by something else. info.json contains:\n\n${text}`);
+				throw new Error(`The dynamic storage seems to be being used by something else. The info.json contains:\n\n${text}`);
 			}
-		}
-		else {
-			storage.writeFile("info.json", JSON.stringify({
-				type: "Bopfall"
-			}));
+		},
+		config: async _ => {
+			config.main = await loadJSONOrDefault("misc/config.json", "config.json");	
+			config.main.commitInterval *= 1000;
+		},
+		persistentState: async _ => {
+			state.persistent = await loadJSONOrDefault("misc/persistentState.json", "persistentState.json");	
 		}
 	}
 }

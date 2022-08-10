@@ -1,0 +1,9 @@
+{
+	"type": "Bopfall",
+	"version": {
+		"info": 1,
+		"db": 1,
+		"config": 1,
+		"persistentState": 1
+	}
+}
