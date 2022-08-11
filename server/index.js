@@ -5,10 +5,11 @@ Register network event listener, display message when offline and disable some t
 Prevent slashes on the end of client domains
 
 = Tweaks =
-Tidy up Local.js by using the load JSON function
+
+= Optimisations =
 
 = Security =
-Handle CORS in a safe but functional way when the config hasn't yet been loaded. Maybe don't register most endpoints or register them with default CORS initially? Maybe return early with HTTP error if not fully started, possibly could be narrow timing window due to the preflight
+
 */
 
 let startTimestamp = performance.now();
@@ -26,40 +27,14 @@ const fs = moreFS.promises;
 const ipPackage = require("ip");
 const IP = ipPackage.address();
 
-const makeExposedPromise = _ => {
-	let resolve;
-	let promise = new Promise(res => {
-		resolve = res;
-	});
-	promise.resolve = resolve;
-	return promise;
-};
-const loadJSONOrDefault = async (filePath, defaultValuePath=filePath) => {
-	if (! (await storage.exists(filePath))) {
-		let loadedData = JSON.parse(
-			await fs.readFile(
-				path.accessLocal(
-					"default/" + defaultValuePath
-				)
-			)
-		);
-		await storage.writeFile(filePath, JSON.stringify(loadedData));
-		return loadedData;
-	}
-
-	try {
-		return JSON.parse(
-			await storage.readFile(filePath)
-		);
-	}
-	catch {
-		throw new Error(`Invalid JSON in the ${filePath} file (in the dynamic storage).`);
-	}
-};
-
 const express = require("express");
 const corsAndAuth = require("./src/corsAndAuth.js");
 const { exit } = require("process");
+const {
+	makeExposedPromise, loadJSONOrDefault, loadJSON,
+	setJSONToDefault,
+	...tools
+} = require("./src/tools.js");
 const app = express();
 let server;
 
@@ -152,11 +127,13 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 
 		{
 			const load = startServer.load;
+			const setup = startServer.setup;
 			await load.info();
+			await setup.initialFiles();
+
 			await load.config();
 			await load.persistentState();
 		}
-		console.log(state, config, info);
 
 		setInterval(periodicCommit, config.main.commitInterval);
 	},
@@ -175,12 +152,30 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 		
 		// TODO: check syntax
 	
-		storage = require(`./storageModules/scripts/${storageModuleData.script}`);	
+		storage = require(`./storageModules/scripts/${storageModuleData.script}`);
+		tools.setStorage(storage);
 		// TODO: check exports
 	
 		if (storage.init) {
 			const output = storage.init(config.storage, storageModuleData);
 			if (output instanceof Promise) await output;
+		}
+	},
+	setup: {
+		initialFiles: async _ => {
+			if (info.initialFilesMade) return;
+
+			await Promise.all([ // Load all the defaults and store the values in new files, in parrelel
+				(async _ => {
+					config.main = await setJSONToDefault("config.json");
+				})(),
+				(async _ => {
+					state.persistent = await setJSONToDefault("persistentState.json");
+				})()
+			]);
+
+			info.initialFilesMade = true;
+			await storage.writeFile("info.json", JSON.stringify(info));
 		}
 	},
 	load: {
@@ -191,11 +186,16 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 			}
 		},
 		config: async _ => {
-			config.main = await loadJSONOrDefault("misc/config.json", "config.json");	
+			if (config == null) {
+				config.main = await loadJSON("config.json");	
+			}
+
 			config.main.commitInterval *= 1000;
 		},
 		persistentState: async _ => {
-			state.persistent = await loadJSONOrDefault("misc/persistentState.json", "persistentState.json");	
+			if (state.persistent == null) {
+				state.persistent = await loadJSON("persistentState.json");	
+			}
 		}
 	}
 }

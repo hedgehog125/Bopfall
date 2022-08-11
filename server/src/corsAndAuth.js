@@ -1,6 +1,6 @@
 module.exports.middleware = (config, fullStart, state) => {
 	const indexArray = arr => {
-		let indexed = {};
+		let indexed = Object.create(null, {});
 		for (let item of arr) {
 			indexed[item] = true;
 		}

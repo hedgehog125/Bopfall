@@ -31,7 +31,7 @@ module.exports = {
 		{
 			let isFile;
 			try {
-				isFile = (await fs.stat(path.accessLocal("storage/.fileIndex.sjon"))).isFile();
+				isFile = (await fs.stat(path.accessLocal("storage/.fileIndex.json"))).isFile();
 			}
 			catch {
 				await fs.writeFile(path.accessLocal("storage/.fileIndex.json"), "{}");
@@ -69,11 +69,12 @@ module.exports = {
 	},
 	
 	readFile: async filePath => {
+		debugger;
 		if (! fileIndex.has(filePath)) {
 			throw new Error("The file does not exist.");
 		}
 
-		return await fs.readFile(path.accessLocal("storage/" + fileIndex[filePath]));
+		return await fs.readFile(path.accessLocal("storage/" + fileIndex.get(filePath)));
 	},
 	
 	rename: async (filePath, newName) => {
