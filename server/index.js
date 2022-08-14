@@ -7,6 +7,7 @@ Prevent slashes on the end of client domains
 = Tweaks =
 
 = Optimisations =
+Load some modules after initial install
 
 = Security =
 
@@ -15,28 +16,31 @@ Prevent slashes on the end of client domains
 let startTimestamp = performance.now();
 
 
-require("dotenv").config();
+import dotenv from "dotenv";
+dotenv.config();
 if (process.env.STORAGE == null) {
-	throw new Error("The environment variable STORAGE is not set. Bopfall has no way to access its storage without it.");
+	throw new Error("The environment variable \"STORAGE\" is not set. Bopfall has no way to access its storage without it.");
 }
 
-const path = require("sandboxed-path");
-const moreFS = require("fs");
+import path from "sandboxed-path";
+import moreFS from "fs";
 const fs = moreFS.promises;
 
-const ipPackage = require("ip");
+import ipPackage from "ip";
 const IP = ipPackage.address();
 
-const express = require("express");
-const corsAndAuth = require("./src/corsAndAuth.js");
-const { exit } = require("process");
+import express from "express";
+import corsAndAuth from "./src/corsAndAuth.js";
+import { exit } from "process";
+import * as tools from "./src/tools.js";
 const {
 	makeExposedPromise, loadJSONOrDefault, loadJSON,
-	setJSONToDefault,
-	...tools
-} = require("./src/tools.js");
+	setJSONToDefault
+} = tools;
 const app = express();
 let server;
+
+import * as musicMetadata from "music-metadata";
 
 const state = {
 	started: false,
@@ -65,7 +69,7 @@ const LATEST_VERSIONS = {
 
 const startServer = {
 	basic: _ => {
-		app.use(corsAndAuth.middleware({
+		app.use(corsAndAuth({
 			wildcardCorsRoutes: [
 				"/info",
 				"/waitUntilStart"
@@ -139,7 +143,11 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 	},
 
 	storageModule: async _ => {
-		const storageModules = JSON.parse(await fs.readFile(path.accessLocal("storageModules/config.json"))).modules;
+		const storageModules = JSON.parse(
+			await fs.readFile(
+				path.accessLocal("storageModules/config.json")
+			)
+		).modules;
 	
 		const type = config.storage.type;
 		const storageModuleData = storageModules[type];
@@ -152,7 +160,7 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 		
 		// TODO: check syntax
 	
-		storage = require(`./storageModules/scripts/${storageModuleData.script}`);
+		storage = await import("./storageModules/scripts/" + storageModuleData.script);
 		tools.setStorage(storage);
 		// TODO: check exports
 	
@@ -186,7 +194,7 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 			}
 		},
 		config: async _ => {
-			if (config == null) {
+			if (config.main == null) {
 				config.main = await loadJSON("config.json");	
 			}
 

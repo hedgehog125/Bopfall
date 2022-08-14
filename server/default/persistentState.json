@@ -1,4 +1,6 @@
 {
 	"passwordSet": false,
-	"initialConfigDone": false
+	"initialConfigDone": false,
+
+	"uploading": false
 }

@@ -1,4 +1,4 @@
-module.exports.middleware = (config, fullStart, state) => {
+const middleware = (config, fullStart, state) => {
 	const indexArray = arr => {
 		let indexed = Object.create(null, {});
 		for (let item of arr) {
@@ -67,3 +67,4 @@ module.exports.middleware = (config, fullStart, state) => {
 		next();
 	};
 };
+export default middleware;

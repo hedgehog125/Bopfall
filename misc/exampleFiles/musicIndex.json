@@ -1,0 +1,34 @@
+{
+	"artists": [
+		{
+			"name": "Rick Astley",
+			"image": 0
+		}
+	],
+	"albums": [
+		{
+			"name": "...",
+			"image": 1,
+			"artist": 0
+		}
+	],
+	"tracks": [
+		{
+			"name": "Never Gonna Give You Up",
+			"fileName": "never gonna give you up.mp3",
+			"artist": 0,
+			"album": 0,
+			"duration": 332,
+			"metaManuallyChanged": false,
+			"hash": "..."
+		}
+	],
+	"playlists": [
+		{
+			"name": "Rolling",
+			"tracks": [
+				0
+			]
+		}
+	]
+}
