@@ -4,7 +4,9 @@
 		"info": 1,
 		"db": 1,
 		"config": 1,
-		"persistentState": 1
+		"state": 1,
+		"musicIndex": false,
+		"login": false
 	},
 	"initialFilesMade": false
 }

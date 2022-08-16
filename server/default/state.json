@@ -1,0 +1,13 @@
+{
+	"auth": {
+		"passwordSet": false,
+		"lastFailTime": null,
+		"failedAttempts": 0,
+
+		"hash": null,
+		"sessions": {}
+	},
+	"initialConfigDone": false,
+
+	"uploading": false
+}

@@ -1,4 +1,21 @@
 {
 	"clientDomains": [],
-	"commitInterval": 15
+
+	"timings": {
+		"commitInterval": 15,
+		"auth": {
+			"increaseAfterAttempts": 10,
+			"failedLogin": {
+				"normal": 2,
+				"increased": 300
+			},
+			"validFor": {
+				"normal": 10080,
+				"initial": 5
+			}
+		}
+	},
+	"log": {
+		"failedLogins": true
+	}
 }

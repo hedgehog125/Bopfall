@@ -67,7 +67,6 @@ export const writeFile = async (filePath, data) => {
 	await fs.writeFile(path.accessLocal("storage/" + storedPath), data);
 };
 export const readFile = async filePath => {
-	debugger;
 	if (! fileIndex.has(filePath)) {
 		throw new Error("The file does not exist.");
 	}
@@ -75,7 +74,7 @@ export const readFile = async filePath => {
 	return await fs.readFile(path.accessLocal("storage/" + fileIndex.get(filePath)));
 };
 export const rename = async (filePath, newName) => {
-	console.log("TODO");
+	console.log("TODO: rename");
 };
 export const periodicCommit = async _ => {
 	await commit();

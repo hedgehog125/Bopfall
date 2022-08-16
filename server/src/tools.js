@@ -2,6 +2,8 @@ import path from "sandboxed-path";
 import moreFS from "fs";
 const fs = moreFS.promises;
 
+import { randomUUID } from "crypto";
+
 let storage;
 
 export const makeExposedPromise = _ => {
@@ -48,4 +50,21 @@ export const loadJSONOrDefault = async (filePath, defaultValuePath=filePath) => 
 	}
 
 	return loadJSON(filePath);
+};
+
+export const indexArray = arr => {
+	let indexed = Object.create(null, {});
+	for (let item of arr) {
+		indexed[item] = true;
+	}
+	return indexed;
+};
+export const uniqueID = existing => {
+	while (true) {
+		let id = randomUUID();
+		if (! existing.has(id)) return id;
+	}
+};
+export const waitDelay = delay => {
+	return new Promise(resolve => {setTimeout(_ => {resolve()}, delay)});
 };
