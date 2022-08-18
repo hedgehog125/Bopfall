@@ -4,6 +4,7 @@
 	"description": "The server for managing the Bopfall database and sometimes serving the files",
 	"main": "index.js",
 	"scripts": {
+		"start": "node index.js",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"author": "Nico Clack (Hedgehog125)",

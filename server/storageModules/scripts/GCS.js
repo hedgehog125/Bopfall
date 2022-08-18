@@ -1,11 +1,11 @@
-const { Storage } = require("@google-cloud/storage");
+import { Storage } from "@google-cloud/storage";
 let storage;
 let bucket;
 
 export const init = async config => {
 	storage = new Storage({
 		projectId: config.project,
-		keyFilename: "keys.json"
+		credentials: JSON.parse(process.env.KEYS)
 	});
 	bucket = storage.bucket(config.bucket);
 };
