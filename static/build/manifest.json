@@ -1,1 +1,76 @@
-{"icons":[{"src":"appIcon.svg","sizes":"any","type":"image/svg+xml"},{"src":"appIcon.png","sizes":"512x512","type":"image/png"},{"src":"maskableAppIcon.png","sizes":"512x512","type":"image/png","purpose":"maskable"}],"name":"**Insert value**","short_name":"**Insert value**","start_url":"/","background_color":"white","theme_color":"#1e3bbe","description":"**Insert value**","display":"fullscreen","orientation":"any","scope":"/"}
+{
+  ".svelte-kit/runtime/client/start.js": {
+    "file": "app/immutable/start-c42af930.js",
+    "src": ".svelte-kit/runtime/client/start.js",
+    "isEntry": true,
+    "imports": [
+      "_index-13519574.js",
+      "_paths-abcb058a.js"
+    ],
+    "dynamicImports": [
+      ".svelte-kit/runtime/components/layout.svelte",
+      ".svelte-kit/runtime/components/error.svelte",
+      "src/routes/index.svelte",
+      "src/routes/login.svelte"
+    ]
+  },
+  ".svelte-kit/runtime/components/layout.svelte": {
+    "file": "app/immutable/layout.svelte-3c760e12.js",
+    "src": ".svelte-kit/runtime/components/layout.svelte",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_index-13519574.js"
+    ]
+  },
+  ".svelte-kit/runtime/components/error.svelte": {
+    "file": "app/immutable/error.svelte-c02dca0d.js",
+    "src": ".svelte-kit/runtime/components/error.svelte",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_index-13519574.js"
+    ]
+  },
+  "src/routes/index.svelte": {
+    "file": "app/immutable/pages/index.svelte-cd26cc3d.js",
+    "src": "src/routes/index.svelte",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_index-13519574.js",
+      "_LinkPage-a185863e.js",
+      "_paths-abcb058a.js"
+    ]
+  },
+  "src/routes/login.svelte": {
+    "file": "app/immutable/pages/login.svelte-61fc2058.js",
+    "src": "src/routes/login.svelte",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_index-13519574.js",
+      "_LinkPage-a185863e.js",
+      "_paths-abcb058a.js"
+    ],
+    "css": [
+      "app/immutable/assets/login-7a0a7546.css"
+    ]
+  },
+  "_index-13519574.js": {
+    "file": "app/immutable/chunks/index-13519574.js"
+  },
+  "_paths-abcb058a.js": {
+    "file": "app/immutable/chunks/paths-abcb058a.js"
+  },
+  "_LinkPage-a185863e.js": {
+    "file": "app/immutable/chunks/LinkPage-a185863e.js",
+    "imports": [
+      "_paths-abcb058a.js"
+    ]
+  },
+  "src/routes/login.css": {
+    "file": "app/immutable/assets/login-7a0a7546.css",
+    "src": "src/routes/login.css"
+  }
+}

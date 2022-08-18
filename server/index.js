@@ -6,11 +6,14 @@ Register error listener to shut down properly. Maybe store files using different
 Prevent slashes on the end of client domains. Also ignore ending slashes on request urls
 
 = Tweaks =
+Move parts of the code into tools.js
+Create separate routes.js file
 
 = Optimisations =
 Load some modules after initial install
 
 = Security =
+Implement the fail counter and fail delays. Measure from when the check started as it can take a second
 
 = Small features =
 Give proper error when the port is already being used
@@ -49,7 +52,9 @@ const {
 const app = express();
 let server;
 
+import * as bcrypt from "bcrypt";
 import * as musicMetadata from "music-metadata";
+import { createTerminus } from "@godaddy/terminus";
 
 const state = {
 	started: false,
@@ -102,14 +107,15 @@ const startServer = {
 			],
 			initialConfigRoutes: [ // All client domains for these requests are treated as trusted (instead of just CORS wildcard) during some of the initial config, as CORS isn't configured yet. Only applies when CORS hasn't been configured yet 
 				"/login",
-				"/login/check", // TODO: remove
+				"/login/check",
 				"/config/set/clientDomains"
 			],
 			noAuthRoutes: [
 				"/info",
 				"/waitUntilStart",
 				"/info/passwordSet",
-				"/login"
+				"/login",
+				"/password/change" // Has it's own authentication like /login
 			],
 			mainConfig: config
 		}, tasks.fullStart, state));
@@ -133,43 +139,73 @@ const startServer = {
 		app.get("/info/passwordSet", (req, res) => {
 			res.send(state.persistent.auth.passwordSet.toString());
 		});
-		app.post("/login", express.json(), (req, res) => {
-			const authState = state.persistent.auth;
 
-			let valid = false;
-			if (authState.passwordSet) {
+		{
+			const createAndSendSession = res => {
+				const authState = state.persistent.auth;
 
-			}
-			else {
-				if (req.body.password == process.env.INITIAL_CODE) {
-					valid = true;
+				const sessionID = tools.uniqueID(authState.sessions);
+				authState.sessions.set(sessionID, {
+					isInitial: ! authState.passwordSet,
+					lastRenewTime: Date.now()
+				});
+				filesUpdated.state = true;
+
+				const validFor = config.main.timings.auth.validFor;
+				res.cookie("session", sessionID, {
+					maxAge: authState.passwordSet? validFor.normal : validFor.initial,
+					httpOnly: true,
+					secure: true,
+					sameSite: "none"
+				});
+			};
+
+			app.post("/login", express.json(), (req, res) => {
+				const authState = state.persistent.auth;
+	
+				let valid = false;
+				if (authState.passwordSet) {
+	
 				}
-			}
-			if (! valid) {
-				console.log(authState, req.body.password, process.env.INITIAL_CODE);
-				res.status(401).send("InvalidPassword");
-				return;
-			}
-
-			const sessionID = tools.uniqueID(authState.sessions);
-			authState.sessions.set(sessionID, {
-				isInitial: ! authState.passwordSet,
-				lastRenewTime: Date.now()
+				else {
+					if (req.body.password == process.env.INITIAL_CODE) {
+						valid = true;
+					}
+				}
+				if (! valid) {
+					console.log(authState, req.body.password, process.env.INITIAL_CODE);
+					res.status(401).send("InvalidPassword");
+					return;
+				}
+	
+				createAndSendSession(res);
+				res.send();
 			});
-			filesUpdated.state = true;
-
-			const validFor = config.main.timings.auth.validFor;
-			res.cookie("session", sessionID, {
-				maxAge: authState.passwordSet? validFor.normal : validFor.initial,
-				httpOnly: true,
-				secure: true,
-				sameSite: "none"
+			app.post("/login/check", (req, res) => {
+				res.send("LoggedIn");
 			});
-			res.send();
-		});
-		app.post("/login/check", (req, res) => {
-			res.send("LoggedIn");
-		});
+			app.post("/password/change", express.json(), (req, res) => {
+				console.log("TODO: check req.json.password");
+			});
+			app.post("/password/change/initial", express.json(), async (req, res) => { // The normal authentication is used for this instead of requiring the password again, as the user will have just logged in and the security is already weak during this state anyway
+				const authState = state.persistent.auth;
+				if (authState.passwordSet) {
+					res.status(409).send("PasswordAlreadySet");
+					return;
+				}
+	
+				const sessions = authState.sessions;
+				sessions.clear();
+				filesUpdated.state = true;
+				
+				authState.hash = await bcrypt.hash(req.json.newPassword, 10);
+				authState.passwordSet = true;
+	
+				createAndSendSession(res);
+				res.send();
+			});
+		}
+
 	
 		let startTime = (performance.now() - startTimestamp) / 1000;
 		server = app.listen(PORT, _ => {
@@ -180,6 +216,19 @@ For access on the same machine: http://localhost:${PORT}/
 And for other devices on your LAN: http://${IP}:${PORT}/
 `
 			);
+		});
+		createTerminus(server, {
+			signals: ["SIGTERM", "SIGINT"],
+			beforeShutdown: _ => {
+				console.log("\n\nShutting down...");
+				console.log("Finishing requests... (Connection: Keep-Alive might mean this takes a second)");
+			},
+			onSignal: shutdown,
+			onShutdown: _ => {
+				console.log("\nSuccessfully shut down.\n");
+			},
+
+			timeout: 10 * SECONDS_TO_MS
 		});
 	},
 	full: async _ => {
@@ -308,7 +357,6 @@ const commit = async _ => {
 			});
 
 			tasks.push((async _ => {
-				console.log(`Committing ${fileName}.json...`);
 				await storage.writeFile(fileName + ".json", value);
 				console.log(`Committed ${fileName}.json`);
 			})());
@@ -317,33 +365,16 @@ const commit = async _ => {
 	}
 	await Promise.all(tasks);
 };
-const shutdown = _ => {
-	console.log("\nShutting down...");
-	
-	const onServerStop = async _ => {
-		console.log("Server stopped, committing files...");
+const shutdown = async _ => {
+	console.log("Committing files...\n");	
+	await commit();
 
-		await commit();
-		if (storage.shutdown) {
-			const output = storage.shutdown();
-			if (output instanceof Promise) await output;
-		}
-
-		console.log("Successfully shut down.\n");
-		process.exit();
-	};
-
-	if (server) {
-		server.close(_ => {
-			onServerStop();
-		});
-	}
-	else {
-		onServerStop();
+	if (storage.shutdown) {
+		console.log("\nShutting down storage module...");
+		const output = storage.shutdown();
+		if (output instanceof Promise) await output;
 	}
 };
-process.on("SIGTERM", shutdown);
-process.on("SIGINT", shutdown);
 
 const tick = _ => {
 	{

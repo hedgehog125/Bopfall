@@ -13,26 +13,30 @@ const middleware = (config, fullStart, state) => {
 		if (wildcardCorsRoutes[req.url]) {
 			res.setHeader("Access-Control-Allow-Origin", "*");
 			res.setHeader("Access-Control-Allow-Headers", "*");
+			return true;
 		}
 		else {
 			await fullStart;
 	
-			if (! clientDomainsConfigured) { // Some routes will have to trust every domain because they are required to configure CORS
-				if (initialConfigRoutes[req.url]) {
-					res.setHeader("Access-Control-Allow-Origin", origin);
-					res.setHeader("Access-Control-Allow-Headers", "*");
+			if (clientDomainsConfigured) {
+				if (clientDomains[origin]) {
+					sendFullCors(origin, res);
 					return true;
 				}
-				return false;
 			}
-	
-			if (clientDomains[origin]) {
-				res.setHeader("Access-Control-Allow-Origin", origin);
-				res.setHeader("Access-Control-Allow-Headers", "*");
+			else { // Some routes will have to trust every domain because they are required to configure CORS
+				if (initialConfigRoutes[req.url]) {
+					sendFullCors(origin, res);
+					return true;
+				}
 			}
-			else return false;
 		}
-		return true;
+		return false;
+	};
+	const sendFullCors = (origin, res) => {
+		res.setHeader("Access-Control-Allow-Origin", origin);
+		res.setHeader("Access-Control-Allow-Headers", "Content-Type, Cookie, Set-Cookie");
+		res.setHeader("Access-Control-Allow-Credentials", true);
 	};
 	const authenticate = req => {
 		const session = req.cookies.session;

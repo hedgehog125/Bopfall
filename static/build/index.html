@@ -1,18 +1,7 @@
-<!DOCTYPE html><html lang=en><meta charset=utf-8><link href=/SvelteKit-Template/favicon.png rel="alternate icon" type=image/png sizes=32x32><link href=/SvelteKit-Template/favicon.svg rel=icon type=image/svg+xml size=64x64><meta content="**Insert main colour but about 15-20 darker on each RGB channel (assuming 0-255 range)**" name=theme-color><link href=/SvelteKit-Template/manifest.json rel=manifest><link href=/SvelteKit-Template/appIcon.png rel=apple-touch-icon type=image/png sizes=512x512><meta content="width=device-width,initial-scale=1" name=viewport><meta content="**Insert Value**" name=description><title>**Insert Name**</title><meta content="" http-equiv=content-security-policy><link href=/SvelteKit-Template/app/immutable/assets/index-d116e0d4.css rel=stylesheet><link href=/SvelteKit-Template/app/immutable/start-81ffc767.js rel=modulepreload><link href=/SvelteKit-Template/app/immutable/chunks/index-98033767.js rel=modulepreload><link href=/SvelteKit-Template/app/immutable/chunks/paths-abcb058a.js rel=modulepreload><link href=/SvelteKit-Template/app/immutable/layout.svelte-37f53c34.js rel=modulepreload><link href=/SvelteKit-Template/app/immutable/pages/index.svelte-6d0540e8.js rel=modulepreload><link href=/SvelteKit-Template/app/immutable/chunks/LinkPage-a185863e.js rel=modulepreload><div><main><p>This is a simple demo of the small tools that are included in this template. As well as some reminders for problems I've already solved.</p><br><h1>Components</h1><p>Create a new line only on small screens with the MobileNewline component.</p><span>Try resizing your browser window</span><br class=svelte-t39mn0><span>| or switching to mobile in devtools.</span><br><br><p>Preload assets with the Preload component in the page's svelte file. Use it like this:</p><textarea cols=80 readonly rows=12><script>
-import Preload from &quot;$util/Preload.svelte&quot;;
-import downloadIcon from &quot;$img/download.svg&quot;;
-const assetsToPreload = {
-	image: [
-		downloadIcon
-	]
-};
-</script>
-<svelte:head>
-	<preload {assetstopreload}></preload>
-</svelte:head></textarea><br><p>The component generates preload link elements. The value is the src (which is found by importing the file), and the key is the as attribute.</p><br><h1>Defaults</h1><h2>Defined in app.html</h2><p>This button has a pointer cursor</p><button>Tada</button><br><p>All text also uses sans-sherif</p><br><h1>Misc</h1><ol><li>The build process is configured to minify the HTML<li><p>You can change the base URL by setting URL_PREFIX in svelte.config.js. It'll only be active in the build (not in the dev server) and it requires a rebuild to change.</p><textarea cols=80 readonly rows=10></textarea><br><a href=/SvelteKit-Template/linkDemo>Look, this works! :0</a><li><p>Tools.js currently only has 2 functions, but I'll include new ones in the future as I need them:<ul><li>format.time takes a number of seconds and converts it into a HH:MM:SS format. The second argument lets you limit the number of digit pairs (e.g exclude hours by setting it to 2).<li>format.shorten takes a string as its first argument and the target length as the second. If it's over, it'll be trimmed to the max length and have the last 3 characters replaced with "...".</ul></ol></main><script data-sveltekit-hydrate=gbb7gg type=module>import { start } from "/SvelteKit-Template/app/immutable/start-81ffc767.js";
+<!DOCTYPE html><html lang=en><meta charset=utf-8><link href=/Bopfall/favicon.png rel="alternate icon" type=image/png sizes=32x32><link href=/Bopfall/favicon.svg rel=icon type=image/svg+xml size=64x64><meta content=#2F2F2F name=theme-color><link href=/Bopfall/manifest.json rel=manifest><link href=/Bopfall/appIcon.png rel=apple-touch-icon type=image/png sizes=512x512><meta content="width=device-width,initial-scale=1" name=viewport><meta content="A streaming service for your downloaded music" name=description><title>Bopfall</title><meta content="" http-equiv=content-security-policy><link href=/Bopfall/app/immutable/start-c42af930.js rel=modulepreload><link href=/Bopfall/app/immutable/chunks/index-13519574.js rel=modulepreload><link href=/Bopfall/app/immutable/chunks/paths-abcb058a.js rel=modulepreload><link href=/Bopfall/app/immutable/layout.svelte-3c760e12.js rel=modulepreload><link href=/Bopfall/app/immutable/pages/index.svelte-cd26cc3d.js rel=modulepreload><link href=/Bopfall/app/immutable/chunks/LinkPage-a185863e.js rel=modulepreload><div><main></main><script data-sveltekit-hydrate=159vd1c type=module>import { start } from "/Bopfall/app/immutable/start-c42af930.js";
 		start({
-			target: document.querySelector('[data-sveltekit-hydrate="gbb7gg"]').parentNode,
-			paths: {"base":"/SvelteKit-Template","assets":"/SvelteKit-Template"},
+			target: document.querySelector('[data-sveltekit-hydrate="159vd1c"]').parentNode,
+			paths: {"base":"/Bopfall","assets":"/Bopfall"},
 			session: {},
 			route: true,
 			spa: false,
@@ -24,4 +13,4 @@ const assetsToPreload = {
 				params: {},
 				routeId: ""
 			}
-		});</script></div><style>*{font-family:sans-serif}button{cursor:pointer}</style>
+		});</script></div><style>*{font-family:sans-serif}body{background-color:#2f2f2f}button{cursor:pointer}</style>
