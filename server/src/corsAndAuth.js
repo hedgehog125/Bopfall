@@ -3,6 +3,7 @@ import { indexArray } from "./tools.js";
 const middleware = (config, fullStart, state) => {
 	const wildcardCorsRoutes = indexArray(config.wildcardCorsRoutes);
 	const initialConfigRoutes = indexArray(config.initialConfigRoutes);
+	const allowedBeforeInitialConfig = Object.assign(indexArray(config.allowedBeforeInitialConfig), wildcardCorsRoutes, initialConfigRoutes);
 	const noAuthRoutes = indexArray(config.noAuthRoutes);
 	let clientDomains, clientDomainsConfigured;
 
@@ -13,6 +14,7 @@ const middleware = (config, fullStart, state) => {
 		if (wildcardCorsRoutes[req.url]) {
 			res.setHeader("Access-Control-Allow-Origin", "*");
 			res.setHeader("Access-Control-Allow-Headers", "*");
+			res.setHeader("Access-Control-Max-Age", 600);
 			return true;
 		}
 		else {
@@ -35,18 +37,36 @@ const middleware = (config, fullStart, state) => {
 	};
 	const sendFullCors = (origin, res) => {
 		res.setHeader("Access-Control-Allow-Origin", origin);
-		res.setHeader("Access-Control-Allow-Headers", "Content-Type, Cookie, Set-Cookie");
+		res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 		res.setHeader("Access-Control-Allow-Credentials", true);
+		if (clientDomainsConfigured) {
+			res.setHeader("Access-Control-Max-Age", 600);
+		}
 	};
-	const authenticate = req => {
-		const session = req.cookies.session;
-		if (session == null || session == "") return false; // Mostly just to prevent access in the case null or undefined end up being a key in the sessions map
+	const authenticate = (req, res) => {
+		let session = req.headers.authorization;
+		if (session == null || session == "") {
+			res.status(401).send("NoSessionID");
+			return false;
+		}
+		session = session.split(" ");
+		if (session.length != 2) {
+			res.status(400).send("InvalidAuthorizationHeaderFormat");
+			return false;
+		}
+		if (session[0].toLowerCase() != "sessionid") {
+			res.send(400).send("InvalidAuthorizationScheme");
+			return false;
+		}
+		session = session[1];
 
 		const sessions = state.persistent.auth.sessions;
 		if (sessions.has(session)) {
 			sessions.get(session).lastRenewTime = Date.now();
 			return true;
 		}
+
+		res.status(401).send("InvalidSessionID");
 		return false;
 	};
 
@@ -66,12 +86,16 @@ const middleware = (config, fullStart, state) => {
 			return;
 		}
 
-		if (! noAuthRoutes[req.url]) {
-			await fullStart;
-			if (! authenticate(req)) {
-				res.status(401).send("InvalidSession");
+		if (! allowedBeforeInitialConfig[req.url]) {
+			if (! state.persistent.initialConfigDone) {
+				res.status(409).send("InitialConfigIncomplete");
 				return;
 			}
+		}
+
+		if (! noAuthRoutes[req.url]) {
+			await fullStart;
+			if (! authenticate(req, res)) return;
 		}
 		next();
 	};

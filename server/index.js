@@ -5,9 +5,17 @@ Register network event listener, display message when offline and disable some t
 Register error listener to shut down properly. Maybe store files using different names to normal so both are kept?
 Prevent slashes on the end of client domains. Also ignore ending slashes on request urls
 
+= Bugs =
+Check content-type is JSON when req.json is read
+Commit the previous state of files using a backup/ prefix on error, then set something in persistent state so the server won't start again until it's reset. Also log the error I guess?
+
+= Stability =
+Catch file errors and handle them where possible
+
 = Tweaks =
 Move parts of the code into tools.js
 Create separate routes.js file
+Await any start result then stop handling request if invalid
 
 = Optimisations =
 Load some modules after initial install
@@ -44,7 +52,6 @@ import * as tools from "./src/tools.js";
 
 import express from "express";
 import corsAndAuth from "./src/corsAndAuth.js";
-import cookieParser from "cookie-parser";
 const {
 	makeExposedPromise, loadJSONOrDefault, loadJSON,
 	setJSONToDefault
@@ -99,7 +106,7 @@ const MINUTES_TO_MS = SECONDS_TO_MS * 60;
 
 const startServer = {
 	basic: _ => {
-		app.use(cookieParser());
+		app.use(express.json());
 		app.use(corsAndAuth({
 			wildcardCorsRoutes: [ // These are here so they can be accessed while the storage is loading
 				"/info",
@@ -108,7 +115,11 @@ const startServer = {
 			initialConfigRoutes: [ // All client domains for these requests are treated as trusted (instead of just CORS wildcard) during some of the initial config, as CORS isn't configured yet. Only applies when CORS hasn't been configured yet 
 				"/login",
 				"/login/check",
-				"/config/set/clientDomains"
+				"/config/set/clientDomains",
+				"/password/change/initial"
+			],
+			allowedBeforeInitialConfig: [ // Like initialConfigRoutes but for after CORS has been configured. Any remaining routes for the initial config go here
+
 			],
 			noAuthRoutes: [
 				"/info",
@@ -151,21 +162,34 @@ const startServer = {
 				});
 				filesUpdated.state = true;
 
-				const validFor = config.main.timings.auth.validFor;
-				res.cookie("session", sessionID, {
-					maxAge: authState.passwordSet? validFor.normal : validFor.initial,
-					httpOnly: true,
-					secure: true,
-					sameSite: "none"
+				res.json({
+					session: sessionID
 				});
 			};
+			const isPasswordCorrect = async req => await bcrypt.compare(req.body.password, state.persistent.auth.hash);
+			const changePassword = async (req, res) => {
+				const authState = state.persistent.auth;
 
-			app.post("/login", express.json(), (req, res) => {
+				const sessions = authState.sessions;
+				sessions.clear();
+				filesUpdated.state = true;
+				
+				authState.hash = await bcrypt.hash(req.body.newPassword, 10);
+				authState.passwordSet = true;
+				filesUpdated.state = true;
+
+				createAndSendSession(res);
+			};
+
+			app.post("/login", async (req, res) => {
 				const authState = state.persistent.auth;
 	
 				let valid = false;
 				if (authState.passwordSet) {
-	
+					console.log(req.body.password, state.persistent.auth.hash)
+					if (await isPasswordCorrect(req)) {
+						valid = true;
+					}
 				}
 				else {
 					if (req.body.password == process.env.INITIAL_CODE) {
@@ -173,36 +197,36 @@ const startServer = {
 					}
 				}
 				if (! valid) {
-					console.log(authState, req.body.password, process.env.INITIAL_CODE);
-					res.status(401).send("InvalidPassword");
+					res.status(401).send("IncorrectPassword");
 					return;
 				}
 	
 				createAndSendSession(res);
-				res.send();
 			});
 			app.post("/login/check", (req, res) => {
 				res.send("LoggedIn");
 			});
-			app.post("/password/change", express.json(), (req, res) => {
-				console.log("TODO: check req.json.password");
+			app.post("/password/change", async (req, res) => {
+				const authState = state.persistent.auth;
+				if (! authState.passwordSet) {
+					res.status(409).send("PasswordNotSet");
+					return;
+				}
+				if (! (await isPasswordCorrect(req))) {
+					res.status(401).send("IncorrectPassword");
+					return;
+				}
+
+				await changePassword(req, res);
 			});
-			app.post("/password/change/initial", express.json(), async (req, res) => { // The normal authentication is used for this instead of requiring the password again, as the user will have just logged in and the security is already weak during this state anyway
+			app.post("/password/change/initial", async (req, res) => { // The normal authentication is used for this instead of requiring the password again, as the user will have just logged in and the security is already weak during this state anyway
 				const authState = state.persistent.auth;
 				if (authState.passwordSet) {
 					res.status(409).send("PasswordAlreadySet");
 					return;
 				}
 	
-				const sessions = authState.sessions;
-				sessions.clear();
-				filesUpdated.state = true;
-				
-				authState.hash = await bcrypt.hash(req.json.newPassword, 10);
-				authState.passwordSet = true;
-	
-				createAndSendSession(res);
-				res.send();
+				await changePassword(req, res);
 			});
 		}
 
