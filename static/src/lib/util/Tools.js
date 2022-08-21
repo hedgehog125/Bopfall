@@ -25,6 +25,14 @@ export const timing = {
 	setTimeoutOrImmediate: (callback, delay, ...params) => {
 		if (delay <= 0) callback(...params);
 		else return setTimeout(callback, delay, ...params);
+	},
+	makeExposedPromise: _ => {
+		let resolve;
+		let promise = new Promise(res => {
+			resolve = res;
+		});
+		promise.resolve = resolve;
+		return promise;
 	}
 };
 export const response = {
@@ -46,5 +54,66 @@ export const connection = {
 			return false;
 		}
 		return true;
+	}
+};
+export const navigateTo = {
+	originalPage: _ => {
+		const params = new URL(location.href).searchParams;
+
+		let returnPage = params.get("returnTo");
+		if (returnPage == null) returnPage = "";
+
+		location.href = linkPage(returnPage);
+	},
+	temporaryPage: path => {
+		const url = new URL(location.href);
+		url.searchParams.set("returnTo", url.pathname);
+		url.pathname = linkPage(path);
+
+		location.href = url;
+	}
+};
+export const db = {
+	readParrelel: async (db, allProperties) => {
+		let read = {};
+		let promises = [];
+		for (let [store, properties] of Object.entries(allProperties)) {
+			for (let property of properties) {
+				promises.push((async _ => {
+					read[property] = await db.get(store, property);
+				})());
+			}
+		}
+	
+		await Promise.all(promises);
+		return read;
+	},
+	writeParrelel: async (db, allPropertiesAndValues, replace = false, transaction) => {
+		let promises = [];
+		for (let [store, properties] of Object.entries(allPropertiesAndValues)) {
+			for (let [property, value] of Object.entries(properties)) {
+				promises.push((async _ => {
+					if (transaction) {
+						let storeOb = transaction.objectStore(store);
+						if (replace) {
+							await storeOb.put(value, property);
+						}
+						else {
+							await storeOb.add(value, property);
+						}
+					}
+					else {
+						if (replace) {
+							await db.put(store, value, property);
+						}
+						else {
+							await db.add(store, value, property);
+						}
+					}
+				})());
+			}
+		}
+	
+		await Promise.all(promises);
 	}
 };

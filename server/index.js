@@ -1,6 +1,10 @@
 /*
 TODO
 
+Redirect to /initialSetup if it's not done yet
+Put domain and password on the same page, but check domain one the box has been unfocussed
+
+
 Register network event listener, display message when offline and disable some things
 Register error listener to shut down properly. Maybe store files using different names to normal so both are kept?
 Prevent slashes on the end of client domains. Also ignore ending slashes on request urls
@@ -11,19 +15,24 @@ Commit the previous state of files using a backup/ prefix on error, then set som
 
 = Stability =
 Catch file errors and handle them where possible
+Send server version in /info and have client check it in the background on connect, then error if incompatible. Maybe have syntax version?
+Handle wasUpgradingTo not being -1
 
 = Tweaks =
 Move parts of the code into tools.js
 Create separate routes.js file
 Await any start result then stop handling request if invalid
+writeParrelel should create a transaction for all the writes. Maybe for readParrelel as well?
 
 = Optimisations =
 Load some modules after initial install
+Cache backend values between pages
 
 = Security =
 Implement the fail counter and fail delays. Measure from when the check started as it can take a second
 
 = Small features =
+Add shaking animation on error in forms
 Give proper error when the port is already being used
 Update credits to include new packages
 
@@ -114,9 +123,10 @@ const startServer = {
 			],
 			initialConfigRoutes: [ // All client domains for these requests are treated as trusted (instead of just CORS wildcard) during some of the initial config, as CORS isn't configured yet. Only applies when CORS hasn't been configured yet 
 				"/login",
-				"/login/check",
+				"/login/status/check",
 				"/config/set/clientDomains",
-				"/password/change/initial"
+				"/password/change/initial",
+				"/password/status/set"
 			],
 			allowedBeforeInitialConfig: [ // Like initialConfigRoutes but for after CORS has been configured. Any remaining routes for the initial config go here
 
@@ -124,7 +134,7 @@ const startServer = {
 			noAuthRoutes: [
 				"/info",
 				"/waitUntilStart",
-				"/info/passwordSet",
+				"/password/status/set",
 				"/login",
 				"/password/change" // Has it's own authentication like /login
 			],
@@ -145,10 +155,6 @@ const startServer = {
 			else {
 				res.send();
 			}
-		});
-
-		app.get("/info/passwordSet", (req, res) => {
-			res.send(state.persistent.auth.passwordSet.toString());
 		});
 
 		{
@@ -186,7 +192,6 @@ const startServer = {
 	
 				let valid = false;
 				if (authState.passwordSet) {
-					console.log(req.body.password, state.persistent.auth.hash)
 					if (await isPasswordCorrect(req)) {
 						valid = true;
 					}
@@ -203,7 +208,7 @@ const startServer = {
 	
 				createAndSendSession(res);
 			});
-			app.post("/login/check", (req, res) => {
+			app.post("/login/status/check", (req, res) => {
 				res.send("LoggedIn");
 			});
 			app.post("/password/change", async (req, res) => {
@@ -229,6 +234,9 @@ const startServer = {
 				await changePassword(req, res);
 			});
 		}
+		app.get("/password/status/set", (req, res) => {
+			res.send(state.persistent.auth.passwordSet.toString());
+		});
 
 	
 		let startTime = (performance.now() - startTimestamp) / 1000;
