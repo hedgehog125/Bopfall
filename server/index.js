@@ -1,9 +1,10 @@
 /*
 TODO
 
+Use temporary variable in changeServerURL, only update it if it's valid. Maybe set to null during it?
+Wrap init, login and changeServerURL in synchronous function and store promise returned for the task. Make init throw on error
 Redirect to /initialSetup if it's not done yet
-Put domain and password on the same page, but check domain one the box has been unfocussed
-
+Use input.setCustomValidity when errors are known about the form. Clear all with input.setCustomValidity("") when it changes
 
 Register network event listener, display message when offline and disable some things
 Register error listener to shut down properly. Maybe store files using different names to normal so both are kept?
@@ -11,7 +12,8 @@ Prevent slashes on the end of client domains. Also ignore ending slashes on requ
 
 = Bugs =
 Check content-type is JSON when req.json is read
-Commit the previous state of files using a backup/ prefix on error, then set something in persistent state so the server won't start again until it's reset. Also log the error I guess?
+Initial autofill gets cleared on page load in login form
+Commit the previous state of files using a backup/prefix on error, then set something in persistent state so the server won't start again until it's reset. Also log the error I guess?
 
 = Stability =
 Catch file errors and handle them where possible
@@ -19,6 +21,7 @@ Send server version in /info and have client check it in the background on conne
 Handle wasUpgradingTo not being -1
 
 = Tweaks =
+Rename info/initialConfigDone to status/initialConfigDone and rename request.info to request.status
 Move parts of the code into tools.js
 Create separate routes.js file
 Await any start result then stop handling request if invalid
@@ -126,13 +129,15 @@ const startServer = {
 				"/login/status/check",
 				"/config/set/clientDomains",
 				"/password/change/initial",
-				"/password/status/set"
+				"/password/status/set",
+				"/info/initialConfigDone"
 			],
 			allowedBeforeInitialConfig: [ // Like initialConfigRoutes but for after CORS has been configured. Any remaining routes for the initial config go here
 
 			],
 			noAuthRoutes: [
 				"/info",
+				"/info/initialConfigDone",
 				"/waitUntilStart",
 				"/password/status/set",
 				"/login",
@@ -146,6 +151,9 @@ const startServer = {
 				type: "Bopfall",
 				status: state.startError? "error" : (state.started? "ready" : "starting")
 			});
+		});
+		app.get("/info/initialConfigDone", (req, res) => {
+			res.send(state.persistent.initialConfigDone.toString());
 		});
 		app.get("/waitUntilStart", async (req, res) => {
 			await tasks.anyFullStartResult;

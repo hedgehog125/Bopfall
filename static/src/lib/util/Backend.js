@@ -14,6 +14,8 @@ const initIfNeeded = async (dataNeeded = true) => {
 	}
 };
 const standardFetch = async (path, args) => {
+	if (serverURL == null) throw new BackendError("NoServerURL");
+
 	let res;
 	try {
 		res = await fetch(serverURL + path, args);
@@ -59,6 +61,7 @@ export const setToast = value => {
 let serverURL;
 let session;
 export const changeServerURL = async value => {
+	if (serverURL == value) return 0;
 	serverURL = value;
 
 	tasks.check = makeExposedPromise();
@@ -109,7 +112,7 @@ export const changeServerURL = async value => {
 };
 
 let db;
-export const init = async (sessionNeeded = false, isLoginPage = false) => {
+export const init = async (sessionNeeded = false, isLoginPage = false, isInitialSetup = false) => {
 	tasks.init = makeExposedPromise();
 
 	db = await openDB("bopfall", 1, {
@@ -145,14 +148,38 @@ export const init = async (sessionNeeded = false, isLoginPage = false) => {
 		read.session != null
 		: (read.metaVersionStored != -1 || read.session != null)
 	;
+	const serverNeeded = read.metaVersionStored == -1;
+
+	let changingPage = false;
 	if (isUsable) {
 		if (isLoginPage) {
-			tools.navigateTo.originalPage();
+			if (await request.info.initialConfigDone()) {
+				tools.navigateTo.originalPage();
+			}
+			else {
+				if (! isInitialSetup) {
+					tools.navigateTo.anotherTemporary("initial-setup");
+				}
+			}
+			changingPage = true;
 		}
 	}
 	else {
 		if (! isLoginPage) {
 			tools.navigateTo.temporaryPage("login");
+			changingPage = true;
+		}
+	}
+
+	if (isUsable) {
+		if (! changingPage) {
+			if (serverNeeded) {
+				if (! (await request.info.initialConfigDone())) {
+					if (! isInitialSetup) {
+						tools.navigateTo.anotherTemporary("initial-setup");
+					}
+				}
+			}
 		}
 	}
 
@@ -192,7 +219,12 @@ export const login = async (password, isSetupCode = false) => {
 		}
 	}, true);
 
-	tools.navigateTo.originalPage();
+	if (await request.info.initialConfigDone()) {
+		tools.navigateTo.originalPage();
+	}
+	else {
+		tools.navigateTo.anotherTemporary("initial-setup");
+	}
 };
 
 const sendRequest = {
@@ -230,7 +262,13 @@ export const request = {
 	info: {
 		passwordSet: async _ => {
 			await initIfNeeded(false);
+
 			return await sendRequest.getBool("/password/status/set");
+		},
+		initialConfigDone: async _ => {
+			await initIfNeeded(false);
+
+			return await sendRequest.getBool("/info/initialConfigDone");
 		}
 	}
 };

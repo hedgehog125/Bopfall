@@ -5,23 +5,37 @@
 	import MobileNewLine from "$util/MobileNewLine.svelte";
 
 	let domain;
+	$: domainChanged = domain == domain;
 	let password;
-	let step = 0;
 	let checkServerTask;
+
 	let displayAsSetupCode = false;
+	let lockForm = false;
 
 	const handleLogin = async _ => {
-		if (step == 1) {
+		lockForm = true;
+		if (checkServerTask) await checkServerTask;
+		if (domainChanged) {
+			changeDomain(false);
 			await checkServerTask;
-			if (step != 1 || backend.status.check != "ok") return;
-			
-			backend.login(password, displayAsSetupCode).catch(_ => {}); // Ignore any errors, it displays a message by itelf and changes page if it's all good
+		}
+		if (backend.status.check == "ok") {
+			backend.login(password, displayAsSetupCode).catch(_ => {
+				lockForm = false;
+			});
 		}
 		else {
-			step = 1;
-			checkServerTask = backend.changeServerURL(domain.includes("://")? domain : "https://" + domain);
-			checkPasswordDisplayMode();
+			lockForm = false;
 		}
+	};
+
+	const changeDomain = (shouldCheckDisplayMode = true) => {
+		if (domain == "" || domain == null) return;
+
+		domainChanged = false;
+		checkServerTask = backend.changeServerURL(domain.includes("://")? domain : "https://" + domain);
+		if (shouldCheckDisplayMode) checkPasswordDisplayMode();
+		return checkServerTask;
 	};
 
 	const checkPasswordDisplayMode = async _ => {
@@ -29,37 +43,26 @@
 		if (backend.status.check == "ok") {
 			displayAsSetupCode = ! (await request.info.passwordSet());
 		}
-		else {
-			step = 0;
-		}
 	};
 </script>
 
 <main>
 	<h2>
-		{#if step == 0}
-			Enter the domain of your server...
-		{:else}
-			{#if displayAsSetupCode}
-				Now enter your setup code...
-			{:else}
-				Now enter your password...
-			{/if}
-		{/if}
+		Welcome!
 	</h2>
 
-	<form on:submit|preventDefault={handleLogin}>
-		{#if step == 0}
-			<input type="text" bind:value={domain} aria-label="The domain name to connect to" placeholder="Enter a domain..." name="username" autocomplete="username">
-		{:else}
-			{#if displayAsSetupCode}
-				<input type="text" bind:value={password} aria-label="Your setup code" placeholder="Enter your setup code..." autocomplete="one-time-code">
-			{:else}
-				<input type="password" bind:value={password} aria-label="Your password" placeholder="Enter your password..." name="password" autocomplete="current-password">
-			{/if}
-		{/if}
-		<MobileNewLine></MobileNewLine>
-		<button type="submit">{step == 0? "Next" : "Connect"}</button>
+	<form on:submit|preventDefault={handleLogin} autocomplete="on">
+		<label for="domain">
+			Domain:
+		</label>
+		<input type="text" required bind:value={domain} on:focusout={changeDomain} disabled={lockForm} aria-label="The domain name to connect to" placeholder="Enter a domain..." name="username" autocomplete="username" id="domain"> <br>
+
+		<label for="password">
+			{displayAsSetupCode? "Setup code" : "Password"}:
+		</label>
+		<input type="password" required bind:value={password} disabled={lockForm} aria-label={displayAsSetupCode? "Your setup code" : "Your password"} placeholder={displayAsSetupCode? "Enter your setup code..." : "Enter your password..."} name="password" autocomplete="current-password" id="password">
+		<br>
+		<button type="submit" disabled={lockForm}>Connect</button>
 	</form>
 </main>
 

@@ -3,7 +3,7 @@
 	import { onMount } from "svelte";
 
 	onMount(_ => {
-		backend.init();
+		backend.init(true, false, true);
 	});
 </script>
 

@@ -71,6 +71,12 @@ export const navigateTo = {
 		url.pathname = linkPage(path);
 
 		location.href = url;
+	},
+	anotherTemporary: path => {
+		const url = new URL(location.href);
+		url.pathname = linkPage(path);
+
+		location.href = url;
 	}
 };
 export const db = {
