@@ -41,7 +41,7 @@
 	const checkPasswordDisplayMode = async _ => {
 		await checkServerTask;
 		if (backend.status.check == "ok") {
-			displayAsSetupCode = ! (await request.info.passwordSet());
+			displayAsSetupCode = ! (await request.password.status.set());
 		}
 	};
 </script>

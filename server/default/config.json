@@ -1,5 +1,6 @@
 {
 	"clientDomains": [],
+	"directStorage": null,
 
 	"timings": {
 		"commitInterval": 15,
@@ -16,6 +17,7 @@
 		}
 	},
 	"log": {
-		"failedLogins": true
+		"security": true,
+		"debug": false
 	}
 }

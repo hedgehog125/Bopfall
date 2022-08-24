@@ -21,8 +21,8 @@ Send server version in /info and have client check it in the background on conne
 Handle wasUpgradingTo not being -1
 
 = Tweaks =
-Rename info/initialConfigDone to status/initialConfigDone and rename request.info to request.status
 Move parts of the code into tools.js
+Port Bagel.js' check function, remove some parts of it and make it part of jsonPlus
 Create separate routes.js file
 Await any start result then stop handling request if invalid
 writeParrelel should create a transaction for all the writes. Maybe for readParrelel as well?
@@ -63,6 +63,7 @@ const IP = ipPackage.address();
 import * as tools from "./src/tools.js";
 
 import express from "express";
+import jsonPlus from "./src/jsonPlus.js";
 import corsAndAuth from "./src/corsAndAuth.js";
 const {
 	makeExposedPromise, loadJSONOrDefault, loadJSON,
@@ -91,6 +92,7 @@ let config = {
 	main: null
 };
 let storage; // Is set when the storage module is started
+let storageInfo;
 const filesUpdated = {
 	info: false,
 	config: false,
@@ -119,6 +121,13 @@ const MINUTES_TO_MS = SECONDS_TO_MS * 60;
 const startServer = {
 	basic: _ => {
 		app.use(express.json());
+		app.use(jsonPlus([
+			"/login",
+			"/password/change",
+			"/password/change/initial",
+			"/cors/change",
+			"/directStorage/change"
+		]));
 		app.use(corsAndAuth({
 			wildcardCorsRoutes: [ // These are here so they can be accessed while the storage is loading
 				"/info",
@@ -127,17 +136,27 @@ const startServer = {
 			initialConfigRoutes: [ // All client domains for these requests are treated as trusted (instead of just CORS wildcard) during some of the initial config, as CORS isn't configured yet. Only applies when CORS hasn't been configured yet 
 				"/login",
 				"/login/status/check",
-				"/config/set/clientDomains",
+
 				"/password/change/initial",
 				"/password/status/set",
-				"/info/initialConfigDone"
+
+				"/cors/change",
+				"/cors/status/clientDomainsConfigured",
+
+				"/initialConfig/status/finished"
 			],
 			allowedBeforeInitialConfig: [ // Like initialConfigRoutes but for after CORS has been configured. Any remaining routes for the initial config go here
+				"/directStorage/change",
+				"/directStorage/status/supported",
+				"/directStorage/status/enabledByModule",
+				"/directStorage/status/enabledByConfig",
+				"/directStorage/status/active",
 
+				"/initialConfig/finish"
 			],
 			noAuthRoutes: [
 				"/info",
-				"/info/initialConfigDone",
+				"/initialConfig/status/finished",
 				"/waitUntilStart",
 				"/password/status/set",
 				"/login",
@@ -151,9 +170,6 @@ const startServer = {
 				type: "Bopfall",
 				status: state.startError? "error" : (state.started? "ready" : "starting")
 			});
-		});
-		app.get("/info/initialConfigDone", (req, res) => {
-			res.send(state.persistent.initialConfigDone.toString());
 		});
 		app.get("/waitUntilStart", async (req, res) => {
 			await tasks.anyFullStartResult;
@@ -211,12 +227,15 @@ const startServer = {
 				}
 				if (! valid) {
 					res.status(401).send("IncorrectPassword");
+					if (config.main.log.security) {
+						console.log("Login failed due to incorrect password or initial code.");
+					}
 					return;
 				}
 	
 				createAndSendSession(res);
 			});
-			app.post("/login/status/check", (req, res) => {
+			app.get("/login/status/check", (req, res) => {
 				res.send("LoggedIn");
 			});
 			app.post("/password/change", async (req, res) => {
@@ -244,6 +263,58 @@ const startServer = {
 		}
 		app.get("/password/status/set", (req, res) => {
 			res.send(state.persistent.auth.passwordSet.toString());
+		});
+
+		app.post("/cors/change", (req, res) => {
+			if (! Array.isArray(req.body.domains)) {
+				res.status(400).send("DomainsNotArray");
+				return;
+			}
+
+			config.main.clientDomains = req.body.domains;
+			filesUpdated.config = true;
+		});
+		app.get("/cors/status/clientDomainsConfigured", (req, res) => {
+			res.send((config.main.clientDomains.length != 0).toString());
+		});
+		app.post("/directStorage/change", (req, res) => {
+			const enable = !!req.body.enable;
+			if (enable && (! storageInfo.directStorage.supported)) {
+				res.send(409).send("DirectStorageNotSupported");
+				return;
+			}
+
+			config.main.directStorage = enable;
+			filesUpdated.config = true;
+		});
+		app.get("/directStorage/status/supported", (req, res) => {
+			res.send(storageInfo.directStorage.supported.toString());
+		});
+		app.get("/directStorage/status/enabledByModule", (req, res) => {
+			res.send(storageInfo.directStorage.enabled.toString());
+		});
+		app.get("/directStorage/status/enabledByConfig", (req, res) => {
+			res.send(tools.stringifyNullableBool(config.main.directStorage));
+		});
+		app.get("/directStorage/status/active", (req, res) => {
+			res.send((storageInfo.directStorage.enabled && config.main.directStorage).toString());
+		});
+
+		app.post("/initialConfig/finish", (req, res) => {
+			const passwordSet = state.persistent.auth.passwordSet;
+			const corsConfigured = config.main.clientDomains.length != 0;
+			const directStorageConfigured = config.main.directStorage != null;
+
+			if (! (passwordSet && corsConfigured && directStorageConfigured)) {
+				res.status(409).send("SomeNotConfigured");
+			}
+
+			state.persistent.initialConfigDone = true;
+			filesUpdated.state = true;
+			res.send();
+		});
+		app.get("/initialConfig/status/finished", (req, res) => {
+			res.send(state.persistent.initialConfigDone.toString());
 		});
 
 	
@@ -315,6 +386,12 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 	
 		storage = await import("./storageModules/scripts/" + storageModuleData.script);
 		tools.setStorage(storage);
+		storageInfo = {
+			directStorage: {
+				supported: false,
+				enabled: false
+			}
+		}
 		// TODO: check exports
 	
 		if (storage.init) {
@@ -398,7 +475,9 @@ const commit = async _ => {
 
 			tasks.push((async _ => {
 				await storage.writeFile(fileName + ".json", value);
-				console.log(`Committed ${fileName}.json`);
+				if (config.main.log.debug) {
+					console.log(`Committed ${fileName}.json`);
+				}
 			})());
 			filesUpdated[fileName] = false;
 		}

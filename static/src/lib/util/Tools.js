@@ -1,5 +1,6 @@
 import linkPage from "$util/LinkPage.js";
 import { dev } from "$app/env";
+import { goto } from "$app/navigation";
 
 export const format = {
 	time: (total, count = 3) => {
@@ -57,26 +58,29 @@ export const connection = {
 	}
 };
 export const navigateTo = {
+	url: url => {
+		goto(url);
+	},
 	originalPage: _ => {
 		const params = new URL(location.href).searchParams;
 
 		let returnPage = params.get("returnTo");
 		if (returnPage == null) returnPage = "";
 
-		location.href = linkPage(returnPage);
+		goto(linkPage(returnPage));
 	},
 	temporaryPage: path => {
 		const url = new URL(location.href);
 		url.searchParams.set("returnTo", url.pathname);
 		url.pathname = linkPage(path);
 
-		location.href = url;
+		goto(url);
 	},
 	anotherTemporary: path => {
 		const url = new URL(location.href);
 		url.pathname = linkPage(path);
 
-		location.href = url;
+		goto(url);
 	}
 };
 export const db = {

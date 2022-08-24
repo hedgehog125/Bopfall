@@ -153,7 +153,7 @@ export const init = async (sessionNeeded = false, isLoginPage = false, isInitial
 	let changingPage = false;
 	if (isUsable) {
 		if (isLoginPage) {
-			if (await request.info.initialConfigDone()) {
+			if (await request.initialConfig.status.finished()) {
 				tools.navigateTo.originalPage();
 			}
 			else {
@@ -174,7 +174,7 @@ export const init = async (sessionNeeded = false, isLoginPage = false, isInitial
 	if (isUsable) {
 		if (! changingPage) {
 			if (serverNeeded) {
-				if (! (await request.info.initialConfigDone())) {
+				if (! (await request.initialConfig.status.finished())) {
 					if (! isInitialSetup) {
 						tools.navigateTo.anotherTemporary("initial-setup");
 					}
@@ -219,7 +219,7 @@ export const login = async (password, isSetupCode = false) => {
 		}
 	}, true);
 
-	if (await request.info.initialConfigDone()) {
+	if (await request.initialConfig.status.finished()) {
 		tools.navigateTo.originalPage();
 	}
 	else {
@@ -242,8 +242,12 @@ const sendRequest = {
 			}
 		})).json();
 	},
-	getBool: async path => {
+	getBool: async (path, throwIfNull = false) => {
 		const res = await sendRequest.getText(path);
+		if (res == "null") {
+			if (throwIfNull) throw new BackendError("BoolIsNull");
+			return null;
+		}
 		return res === "true";
 	},
 
@@ -259,16 +263,22 @@ const sendRequest = {
 	}
 };
 export const request = {
-	info: {
-		passwordSet: async _ => {
-			await initIfNeeded(false);
-
-			return await sendRequest.getBool("/password/status/set");
-		},
-		initialConfigDone: async _ => {
-			await initIfNeeded(false);
-
-			return await sendRequest.getBool("/info/initialConfigDone");
+	password: {
+		status: {
+			set: async _ => {
+				await initIfNeeded(false);
+	
+				return await sendRequest.getBool("/password/status/set");
+			}
+		}
+	},
+	initialConfig: {
+		status: {
+			finished: async _ => {
+				await initIfNeeded(false);
+	
+				return await sendRequest.getBool("/initialConfig/status/finished");
+			}
 		}
 	}
 };

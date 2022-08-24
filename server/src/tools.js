@@ -65,6 +65,7 @@ export const uniqueID = existing => {
 		if (! existing.has(id)) return id;
 	}
 };
+export const stringifyNullableBool = value => value == null? "null" : value.toString();
 export const waitDelay = delay => {
 	return new Promise(resolve => {setTimeout(_ => {resolve()}, delay)});
 };
