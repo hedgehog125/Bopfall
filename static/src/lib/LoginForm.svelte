@@ -2,8 +2,6 @@
 	import * as backend from "$util/Backend.js";
 	const { request } = backend;
 
-	import MobileNewLine from "$util/MobileNewLine.svelte";
-
 	let domain;
 	$: domainChanged = domain == domain;
 	let password;
@@ -13,13 +11,32 @@
 	let lockForm = false;
 
 	const handleLogin = async _ => {
+		console.log("A")
 		lockForm = true;
-		if (checkServerTask) await checkServerTask;
-		if (domainChanged) {
-			changeDomain(false);
-			await checkServerTask;
+		
+		let ok = true;
+		if (checkServerTask) {
+			console.log("D")
+			try {
+				await checkServerTask;
+			}
+			catch {
+				ok = false;
+			}
+			console.log("E")
 		}
-		if (backend.status.check == "ok") {
+		if (domainChanged) {
+			console.log("C")
+			ok = true;
+			try {
+				await changeDomain(false);
+			}
+			catch {
+				ok = false;
+			}
+			console.log("F")
+		}
+		if (ok) {
 			backend.login(password, displayAsSetupCode).catch(_ => {
 				lockForm = false;
 			});
@@ -33,14 +50,24 @@
 		if (domain == "" || domain == null) return;
 
 		domainChanged = false;
+		console.log("=", checkServerTask)
 		checkServerTask = backend.changeServerURL(domain.includes("://")? domain : "https://" + domain);
+		console.log("+", checkServerTask)
 		if (shouldCheckDisplayMode) checkPasswordDisplayMode();
 		return checkServerTask;
 	};
 
 	const checkPasswordDisplayMode = async _ => {
-		await checkServerTask;
-		if (backend.status.check == "ok") {
+		let ok = true;
+		try {
+			console.log("-", checkServerTask)
+			await checkServerTask;
+			console.log("G")
+		}
+		catch {
+			ok = false;
+		}
+		if (ok) {
 			displayAsSetupCode = ! (await request.password.status.set());
 		}
 	};

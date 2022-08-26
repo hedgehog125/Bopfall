@@ -1,9 +1,6 @@
 /*
 TODO
 
-Use temporary variable in changeServerURL, only update it if it's valid. Maybe set to null during it?
-Wrap init, login and changeServerURL in synchronous function and store promise returned for the task. Make init throw on error
-Redirect to /initialSetup if it's not done yet
 Use input.setCustomValidity when errors are known about the form. Clear all with input.setCustomValidity("") when it changes
 
 Register network event listener, display message when offline and disable some things
@@ -45,7 +42,7 @@ let startTimestamp = performance.now();
 
 
 import dotenv from "dotenv";
-dotenv.config();
+if (process.env.STORAGE == null) dotenv.config();
 if (process.env.STORAGE == null) {
 	throw new Error("The environment variable \"STORAGE\" is not set. Bopfall has no way to access its storage without it.");
 }
