@@ -14,6 +14,15 @@
 			"problemMatcher": []
 		},
 		{
+			"label": "Deploy static",
+			"options": {
+				"cwd": "${workspaceFolder}/"
+			},
+			"command": "./deployBuild.sh",
+			"args": [],
+			"problemMatcher": []
+		},
+		{
 			"label": "Dev static",
 			"options": {
 				"cwd": "${workspaceFolder}/static/"
