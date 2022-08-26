@@ -1,0 +1,102 @@
+{
+  "src/lib/imgs/back.svg": {
+    "file": "app/immutable/assets/back-a13284f0.svg",
+    "src": "src/lib/imgs/back.svg"
+  },
+  ".svelte-kit/runtime/client/start.js": {
+    "file": "app/immutable/start-17057818.js",
+    "src": ".svelte-kit/runtime/client/start.js",
+    "isEntry": true,
+    "imports": [
+      "_index-5a079fc8.js",
+      "_singletons-0c0466c6.js"
+    ],
+    "dynamicImports": [
+      ".svelte-kit/runtime/components/layout.svelte",
+      ".svelte-kit/runtime/components/error.svelte",
+      "src/routes/index.svelte",
+      "src/routes/initial-setup.svelte",
+      "src/routes/login.svelte"
+    ]
+  },
+  ".svelte-kit/runtime/components/layout.svelte": {
+    "file": "app/immutable/layout.svelte-a7629326.js",
+    "src": ".svelte-kit/runtime/components/layout.svelte",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_index-5a079fc8.js"
+    ]
+  },
+  ".svelte-kit/runtime/components/error.svelte": {
+    "file": "app/immutable/error.svelte-1c7e97dd.js",
+    "src": ".svelte-kit/runtime/components/error.svelte",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_index-5a079fc8.js"
+    ]
+  },
+  "src/routes/index.svelte": {
+    "file": "app/immutable/pages/index.svelte-3115fa75.js",
+    "src": "src/routes/index.svelte",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_index-5a079fc8.js",
+      "_Backend-117789f0.js",
+      "_singletons-0c0466c6.js"
+    ]
+  },
+  "src/routes/initial-setup.svelte": {
+    "file": "app/immutable/pages/initial-setup.svelte-5ef52ff0.js",
+    "src": "src/routes/initial-setup.svelte",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_index-5a079fc8.js",
+      "_Backend-117789f0.js",
+      "_singletons-0c0466c6.js"
+    ],
+    "css": [
+      "app/immutable/assets/initial-setup-88f801ae.css"
+    ],
+    "assets": [
+      "app/immutable/assets/back-a13284f0.svg"
+    ]
+  },
+  "src/routes/login.svelte": {
+    "file": "app/immutable/pages/login.svelte-4c079a32.js",
+    "src": "src/routes/login.svelte",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_index-5a079fc8.js",
+      "_Backend-117789f0.js",
+      "_singletons-0c0466c6.js"
+    ],
+    "css": [
+      "app/immutable/assets/login-8de2f805.css"
+    ]
+  },
+  "_index-5a079fc8.js": {
+    "file": "app/immutable/chunks/index-5a079fc8.js"
+  },
+  "_singletons-0c0466c6.js": {
+    "file": "app/immutable/chunks/singletons-0c0466c6.js"
+  },
+  "_Backend-117789f0.js": {
+    "file": "app/immutable/chunks/Backend-117789f0.js",
+    "imports": [
+      "_singletons-0c0466c6.js"
+    ]
+  },
+  "src/routes/login.css": {
+    "file": "app/immutable/assets/login-8de2f805.css",
+    "src": "src/routes/login.css"
+  },
+  "src/routes/initial-setup.css": {
+    "file": "app/immutable/assets/initial-setup-88f801ae.css",
+    "src": "src/routes/initial-setup.css"
+  }
+}
