@@ -39,6 +39,7 @@ Update credits to include new packages
 */
 
 let startTimestamp = performance.now();
+console.log("");
 
 
 import dotenv from "dotenv";

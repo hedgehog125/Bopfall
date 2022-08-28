@@ -4,7 +4,6 @@ server/storage
 
 # From sveltekit gitignore
 .DS_Store
-package-lock.json
 .svelte-kit
 .vercel_build_output
 

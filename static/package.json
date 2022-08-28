@@ -9,8 +9,8 @@
 		"prepare": "svelte-kit sync"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-static": "next",
-		"@sveltejs/kit": "next",
+		"@sveltejs/adapter-static": "1.0.0-next.38",
+		"@sveltejs/kit": "1.0.0-next.391",
 		"html-minifier": "^4.0.0",
 		"svelte": "^3.46.0",
 		"vite": "^3.0.0"
