@@ -5,7 +5,6 @@
 	"main": "index.js",
 	"scripts": {
 		"start": "node index.js",
-		"build": "node buildScript.js",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"author": "Nico Clack (Hedgehog125)",
@@ -23,8 +22,5 @@
 	"type": "module",
 	"engines": {
 		"node": "16.x"
-	},
-	"devDependencies": {
-		"esbuild": "^0.15.5"
 	}
 }
