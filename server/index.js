@@ -1,8 +1,9 @@
 /*
 TODO
 
-Use input.setCustomValidity when errors are known about the form. Clear all with input.setCustomValidity("") when it changes
+Cache some server info on the client, keep both in memory and in db. Rely on assumptions about how it'll change like initialConfigDone won't change back to false
 
+Use input.setCustomValidity when errors are known about the form. Clear all with input.setCustomValidity("") when it changes
 Register network event listener, display message when offline and disable some things
 Register error listener to shut down properly. Maybe store files using different names to normal so both are kept?
 Prevent slashes on the end of client domains. Also ignore ending slashes on request urls
@@ -12,12 +13,16 @@ Check content-type is JSON when req.json is read
 Initial autofill gets cleared on page load in login form
 Commit the previous state of files using a backup/prefix on error, then set something in persistent state so the server won't start again until it's reset. Also log the error I guess?
 
+Add backendErrorCaught function that sets shouldStopNextDefault back to its previous value. Should be called every time a BackendError is caught internally in the Backend module
+
 = Stability =
 Catch file errors and handle them where possible
 Send server version in /info and have client check it in the background on connect, then error if incompatible. Maybe have syntax version?
 Handle wasUpgradingTo not being -1
 
 = Tweaks =
+Display toast on network change
+
 Move parts of the code into tools.js
 Port Bagel.js' check function, remove some parts of it and make it part of jsonPlus
 Create separate routes.js file
@@ -25,8 +30,10 @@ Await any start result then stop handling request if invalid
 writeParrelel should create a transaction for all the writes. Maybe for readParrelel as well?
 
 = Optimisations =
-Load some modules after initial install
+Preload images
 Cache backend values between pages
+
+Load some node.js modules after load - Not really worth it
 
 = Security =
 Implement the fail counter and fail delays. Measure from when the check started as it can take a second
@@ -196,6 +203,11 @@ const startServer = {
 			};
 			const isPasswordCorrect = async req => await bcrypt.compare(req.body.password, state.persistent.auth.hash);
 			const changePassword = async (req, res) => {
+				if (req.body.newPassword.length > 128) {
+					res.status(400).send("PasswordTooLong");
+					return;
+				}
+
 				const authState = state.persistent.auth;
 
 				const sessions = authState.sessions;

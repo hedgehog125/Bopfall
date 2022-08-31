@@ -79,17 +79,23 @@
 	</h2>
 
 	<form on:submit|preventDefault={handleLogin} autocomplete="on">
-		<label for="domain">
-			Domain:
-		</label>
-		<input type="text" required bind:value={domain} on:focusout={changeDomain} disabled={lockForm} aria-label="The domain name to connect to" placeholder="Enter a domain..." name="username" autocomplete="username" id="domain"> <br>
+		<section>
+			<label for="domain">
+				Domain to connect to:
+			</label> <br>
+			<input type="text" required bind:value={domain} on:focusout={changeDomain} disabled={lockForm} placeholder="Enter a domain..." name="username" autocomplete="username" id="domain">
+		</section> <br>
 
-		<label for="password">
-			{displayAsSetupCode? "Setup code" : "Password"}:
-		</label>
-		<input type="password" required bind:value={password} disabled={lockForm} aria-label={displayAsSetupCode? "Your setup code" : "Your password"} placeholder={displayAsSetupCode? "Enter your setup code..." : "Enter your password..."} name="password" autocomplete="current-password" id="password">
-		<br>
-		<button type="submit" disabled={lockForm}>Connect</button>
+		<section>
+			<label for="password">
+				{displayAsSetupCode? "Setup code" : "Password"}:
+			</label> <br>
+			<input type="password" required bind:value={password} disabled={lockForm} placeholder={displayAsSetupCode? "Enter your setup code..." : "Enter your password..."} name="password" autocomplete="current-password" id="password">
+		</section> <br>
+
+		<section>
+			<button type="submit" disabled={lockForm}>Connect</button>
+		</section>
 	</form>
 </main>
 

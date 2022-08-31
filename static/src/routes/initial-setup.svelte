@@ -1,4 +1,5 @@
 <script>
+	import Toast from "$util/Toast.svelte";
 	import InitialSetup from "$lib/InitialSetup.svelte";
 
 	import * as backend from "$util/Backend.js";
@@ -6,8 +7,11 @@
 	onMount(_ => {
 		backend.init(true, false, true);
 	});
+
+	let toast;
 </script>
 
 <main>
-	<InitialSetup></InitialSetup>
+	<Toast bind:display={toast}></Toast>
+	<InitialSetup {toast}></InitialSetup>
 </main>

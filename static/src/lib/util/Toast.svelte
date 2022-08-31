@@ -2,7 +2,6 @@
 	import { setToast } from "$util/Backend.js";
 
 	import { fly } from "svelte/transition";
-	// TODO: display on connection change. Also use values from tools.connection.check
 
 	let messageQueue = [];
 	let currentMessage;

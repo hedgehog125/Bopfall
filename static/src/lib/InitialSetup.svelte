@@ -1,70 +1,117 @@
 <script>
+	import { request } from "$util/Backend.js";
+
 	import ChangePassword from "$util/ChangePassword.svelte";
 
 	import backIcon from "$img/back.svg";
 
 	let step = 0;
+	let stepsCompleted = 0;
 	const stepCount = 3;
 	let revisit = false;
 
+	$: completeRevisit = revisit && stepsCompleted == stepCount;
 	$: backLocked = step == 0;
 
+	const load = async _ => {
+		let passwordSet;
+		await Promise.all([
+			(async _ => {
+				passwordSet = await request.password.status.set();
+			})()
+		]);
+
+		step = stepCount;
+		if (true) {
+			step = 2;
+		}
+		if (true) {
+			step = 1;
+		}
+		if (! passwordSet) {
+			step = 0;
+		}
+
+		stepsCompleted = step;
+	};
 	const back = _ => {
 		step--;
+		revisit = true;
 	};
-	const next = _ => {
+	const next = _ => { // Going ahead without completing steps is prevented with the button locking as opposed to something in here
 		if (step == stepCount) {
 
+		}
+		else if (step == stepsCompleted) { // The first step that hasn't been completed yet
+			revisit = false;
 		}
 		else {
 			step++;
 		}
 	};
+	const stepComplete = _ => {
+		stepsCompleted++;
+		next();
+	};
 	const ok = _ => {
 
 	};
+
+	const handlePasswordStateKnown = passwordSet => {
+		if (passwordSet && (! revisit)) {
+			stepComplete();
+		}
+	};
+
+	export let toast;
 </script>
 
 <main>
-	{#if revisit || step == stepCount}
-		{#if step == stepCount}
-			<h1>
-				Does that all look good?
-			</h1> <br> <br>
-		{/if}
-		<button class="ok" on:click={ok}>
-			<div>
-				<span>Ok</span>
-			</div>
-		</button>
-	{:else}
-		<button class="back" on:click={back} disabled={backLocked}>
-			<div>
-				<img src={backIcon} alt="" width=16 height=16> <!-- Alt attribute would just be repeating the span -->
-				<span>Back</span>
-			</div>
-		</button>
-		<button class="next" on:click={next}>
-			<div>
-				<span>Next</span>
-				<img src={backIcon} class="flipped" alt="" width=16 height=16>
-			</div>
-		</button>
-	{/if}
+	{#await load()}
+		TODO: loading symbol with SmoothVisible
+	{:then}
 
-	{#if step != stepCount}
-		{#if step == 0}
-			<ChangePassword></ChangePassword>
-		{:else if step == 1}
-			Step 2
+		{#if completeRevisit || step == stepCount}
+			{#if step == stepCount}
+				<h1>
+					Does that all look good?
+				</h1> <br> <br>
+			{/if}
+			<button class="ok" on:click={ok}>
+				<div>
+					<span>Ok</span>
+				</div>
+			</button>
 		{:else}
-			Step 3
+			<button class="back" on:click={back} disabled={backLocked}>
+				<div>
+					<img src={backIcon} alt="" width=16 height=16> <!-- Alt attribute would just be repeating the span -->
+					<span>Back</span>
+				</div>
+			</button>
+			<button class="next" on:click={next} disabled={step >= stepsCompleted}>
+				<div>
+					<span>Next</span>
+					<img src={backIcon} class="flipped" alt="" width=16 height=16>
+				</div>
+			</button>
 		{/if}
 
-		<span class="progress">
-			Step {step + 1} of {stepCount}
-		</span>
-	{/if}
+		{#if step != stepCount}
+			{#if step == 0}
+				<ChangePassword {toast} handleStateKnown={handlePasswordStateKnown} handleFinish={stepComplete}></ChangePassword>
+			{:else if step == 1}
+				Step 2
+			{:else}
+				Step 3
+			{/if}
+
+			<span class="progress">
+				Step {step + 1} of {stepCount}
+			</span>
+		{/if}
+
+	{/await}
 </main>
 
 <style> 

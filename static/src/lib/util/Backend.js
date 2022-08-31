@@ -2,11 +2,18 @@ import * as tools from "$util/Tools.js";
 import { openDB } from "idb";
 
 export class BackendError extends Error {
-	constructor (name) {
+	constructor (name, isRethrow = false) {
 		super(name);
-		if (! shouldPreventErrorToast) {
-			toast(ERRORS[name], undefined, true);
-			shouldPreventErrorToast = false;	
+		if (! shouldStopNextDefault) {
+			if (! isRethrow) {
+				let errorText = ERRORS[name];
+				if (errorText == null) errorText = ERRORS.Unknown;
+	
+				if (errorText != IGNORE_ERROR) {
+					toast(errorText, undefined, true);
+				}
+			}
+			shouldStopNextDefault = false;	
 		}
 	}
 };
@@ -16,7 +23,7 @@ const initIfNeeded = async (dataNeeded = true) => {
 		if (dataNeeded && (! hasData)) throw new BackendError("LoginNeeded");
 	}
 };
-const standardFetch = async (path, args) => {
+const standardFetch = async (path, args, ignoreNonOk = false) => {
 	if (serverURL == null) throw new BackendError("NoServerURL");
 
 	let res;
@@ -26,14 +33,24 @@ const standardFetch = async (path, args) => {
 	catch {
 		throw new BackendError("Network");
 	}
-	if (! res.ok) throw new BackendError(await res.text());
+	if (! (res.ok || ignoreNonOk)) {
+		const error = await res.text();
+		if (error == "InvalidSessionID") {
+			if (! shouldStopNextDefault) {
+				tools.navigateTo.temporaryPage("login");
+			}
+		}
+
+		throw new BackendError(error, true);
+	}
 	return res;
 };
 const commandDone = _ => {
-	shouldPreventErrorToast = false;
+	shouldStopNextDefault = false;
 };
 
 const INTERNAL_ERROR = "A unhandled error occurred";
+const IGNORE_ERROR = "";
 const ERRORS = {
 	Unknown: "Unknown error",
 	Network: "Network error",
@@ -42,7 +59,8 @@ const ERRORS = {
 	StartFailed: "Server failed to start",
 	IncorrectPassword: "Incorrect password",
 	IncorrectSetup: "Wrong setup code",
-	NoServerURL: INTERNAL_ERROR
+	NoServerURL: INTERNAL_ERROR,
+	BoolIsNull: IGNORE_ERROR
 };
 
 
@@ -60,9 +78,9 @@ export const setToast = value => {
 	toast = value;
 };
 
-let shouldPreventErrorToast = false;
-export const preventNextErrorToast = _ => {
-	shouldPreventErrorToast = true;
+let shouldStopNextDefault = false;
+export const stopNextDefault = _ => {
+	shouldStopNextDefault = true;
 };
 
 let serverURL;
@@ -157,44 +175,47 @@ export const init = (sessionNeeded = false, isLoginPage = false, isInitialSetup 
 		session = read.session;
 	
 		const isUsable = sessionNeeded?
-			read.session != null
-			: (read.metaVersionStored != -1 || read.session != null)
+			(read.session != null && await request.login.status.check())
+			: (read.metaVersionStored != -1 || (read.session != null && ((! isLoginPage) || await request.login.status.check())))
 		;
 		const serverNeeded = read.metaVersionStored == -1;
 	
-		let changingPage = false;
-		if (isUsable) {
-			if (isLoginPage) {
-				if (await request.initialConfig.status.finished()) {
-					tools.navigateTo.originalPage();
-				}
-				else {
-					if (! isInitialSetup) {
-						tools.navigateTo.anotherTemporary("initial-setup");
+		if (! shouldStopNextDefault) {
+			let changingPage = false;
+			if (isUsable) {
+				if (isLoginPage) {
+					if (await request.initialConfig.status.finished()) {
+						tools.navigateTo.originalPage();
 					}
-				}
-				changingPage = true;
-			}
-		}
-		else {
-			if (! isLoginPage) {
-				tools.navigateTo.temporaryPage("login");
-				changingPage = true;
-			}
-		}
-	
-		if (isUsable) {
-			if (! changingPage) {
-				if (serverNeeded) {
-					if (! (await request.initialConfig.status.finished())) {
+					else {
 						if (! isInitialSetup) {
 							tools.navigateTo.anotherTemporary("initial-setup");
 						}
 					}
+					changingPage = true;
 				}
 			}
+			else {
+				if (! isLoginPage) {
+					tools.navigateTo.temporaryPage("login");
+					changingPage = true;
+				}
+			}
+		
+			if (isUsable) {
+				if (! changingPage) {
+					if (serverNeeded) {
+						if (! (await request.initialConfig.status.finished())) {
+							if (! isInitialSetup) {
+								tools.navigateTo.anotherTemporary("initial-setup");
+							}
+						}
+					}
+				}
+			}
+		
 		}
-	
+
 		commandDone();
 		return isUsable;
 	})();
@@ -218,33 +239,38 @@ export const login = async (password, isSetupCode) => {
 		}
 	}, true);
 
-	if (await request.initialConfig.status.finished()) {
-		tools.navigateTo.originalPage();
-	}
-	else {
-		tools.navigateTo.anotherTemporary("initial-setup");
+	if (! shouldStopNextDefault) {
+		if (await request.initialConfig.status.finished()) {
+			tools.navigateTo.originalPage();
+		}
+		else {
+			tools.navigateTo.anotherTemporary("initial-setup");
+		}
 	}
 
 	commandDone();
 };
 
 const sendRequest = {
-	getText: async path => {
+	getText: async (path, ignoreNonOk) => {
 		return await (await standardFetch(path, {
 			headers: {
 				"Authorization": "sessionid " + session
 			}
-		})).text();
+		}, ignoreNonOk)).text();
 	},
-	getJSON: async path => {
-		return await (await standardFetch(path, {
+	getJSON: async (path, ignoreNonOk) => {
+		const res = await standardFetch(path, {
 			headers: {
 				"Authorization": "sessionid " + session
 			}
-		})).json();
+		}, ignoreNonOk);
+
+		if (res.ok) return await res.json();
+		return await res.text();
 	},
-	getBool: async (path, throwIfNull = false) => {
-		const res = await sendRequest.getText(path);
+	getBool: async (path, ignoreNonOk, throwIfNull = false) => {
+		const res = await sendRequest.getText(path, ignoreNonOk);
 		if (res == "null") {
 			if (throwIfNull) throw new BackendError("BoolIsNull");
 			return null;
@@ -252,15 +278,18 @@ const sendRequest = {
 		return res === "true";
 	},
 
-	postJSON: async (path, value) => {
-		return await (await standardFetch(path, {
+	postJSON: async (path, value, ignoreNonOk) => {
+		const res = await standardFetch(path, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
 				"Authorization": "sessionid " + session
 			},
 			body: JSON.stringify(value)
-		})).json();
+		}, ignoreNonOk);
+
+		if (res.ok) return await res.json();
+		return await res.text();
 	}
 };
 export const request = {
@@ -273,6 +302,27 @@ export const request = {
 				commandDone();
 				return result;
 			}
+		},
+		change: {
+			normal: async (oldPassword, newPassword) => {
+				await initIfNeeded(false);
+
+				session = (await sendRequest.postJSON("/password/change", {
+					password: oldPassword,
+					newPassword
+				})).session;
+				await db.put("misc", session, "session");
+				commandDone();
+			},
+			initial: async newPassword => {
+				await initIfNeeded(false);
+
+				session = (await sendRequest.postJSON("/password/change/initial", {
+					newPassword
+				})).session;
+				await db.put("misc", session, "session");
+				commandDone();
+			}
 		}
 	},
 	initialConfig: {
@@ -283,6 +333,24 @@ export const request = {
 				const result = await sendRequest.getBool("/initialConfig/status/finished");
 				commandDone();
 				return result;
+			}
+		}
+	},
+	login: {
+		status: {
+			check: async _ => {
+				await initIfNeeded(false);
+
+				// The server will send a non ok if we're not logged in, so the true prevents the usual handling so it doesn't trigger an error the user sees
+				const res = await sendRequest.getText("/login/status/check", true);
+
+				let loggedIn;
+				if (res == "LoggedIn") loggedIn = true;
+				else if (res == "InvalidSessionID" || res == "NoSessionID") loggedIn = false;
+				else throw new BackendError(res);
+
+				commandDone();
+				return loggedIn;
 			}
 		}
 	}
