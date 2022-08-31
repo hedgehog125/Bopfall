@@ -9,6 +9,10 @@ export class BackendError extends Error {
 				let errorText = ERRORS[name];
 				if (errorText == null) errorText = ERRORS.Unknown;
 	
+				if (errorText == "LoginNeeded") {
+					tools.navigateTo.temporaryPage("login");
+					return;
+				}
 				if (errorText != IGNORE_ERROR) {
 					toast(errorText, undefined, true);
 				}
@@ -18,10 +22,8 @@ export class BackendError extends Error {
 	}
 };
 const initIfNeeded = async (dataNeeded = true) => {
-	if (tasks.init == null) {
-		const hasData = await init();
-		if (dataNeeded && (! hasData)) throw new BackendError("LoginNeeded");
-	}
+	const hasData = await (tasks.init == null? init() : tasks.init);
+	if (dataNeeded && (! hasData)) throw new BackendError("LoginNeeded");
 };
 const standardFetch = async (path, args, ignoreNonOk = false) => {
 	if (serverURL == null) throw new BackendError("NoServerURL");
@@ -35,11 +37,7 @@ const standardFetch = async (path, args, ignoreNonOk = false) => {
 	}
 	if (! (res.ok || ignoreNonOk)) {
 		const error = await res.text();
-		if (error == "InvalidSessionID") {
-			if (! shouldStopNextDefault) {
-				tools.navigateTo.temporaryPage("login");
-			}
-		}
+		if (error == "InvalidSessionID") throw new BackendError("LoginNeeded");
 
 		throw new BackendError(error, true);
 	}
@@ -143,8 +141,11 @@ export const changeServerURL = value => {
 };
 
 let db;
-export const init = (sessionNeeded = false, isLoginPage = false, isInitialSetup = false) => {
+export const init = (sessionNeeded = false, specialPage) => {
 	const promise = (async _ => {
+		const isLoginPage = specialPage == "login";
+		const isInitialSetup = specialPage == "initialSetup";
+
 		db = await openDB("bopfall", 1, {
 			upgrade: async (db, oldVersion, newVersion, transaction) => {
 				db.createObjectStore("files");
@@ -174,17 +175,28 @@ export const init = (sessionNeeded = false, isLoginPage = false, isInitialSetup 
 		serverURL = read.serverURL;
 		session = read.session;
 	
+		// Because it hasn't initialised yet, the proper functions can't be used
+		const isConfigDone = async _ => await sendRequest.getBool("/initialConfig/status/finished");
+		const isLoggedIn = async _ => {
+			const res = await sendRequest.getText("/login/status/check", true);
+
+			if (res == "LoggedIn") return true;
+			else if (res == "InvalidSessionID" || res == "NoSessionID") return false;
+			else throw new BackendError(res);
+		};
+
 		const isUsable = sessionNeeded?
-			(read.session != null && await request.login.status.check())
-			: (read.metaVersionStored != -1 || (read.session != null && ((! isLoginPage) || await request.login.status.check())))
+			(read.session != null && await isLoggedIn())
+			: (read.metaVersionStored != -1 || (read.session != null && ((! isLoginPage) || await isLoggedIn()))) // If this is the login page, make sure the session is valid
 		;
-		const serverNeeded = read.metaVersionStored == -1;
-	
+		
 		if (! shouldStopNextDefault) {
+			const serverNeeded = read.metaVersionStored == -1;
+			
 			let changingPage = false;
 			if (isUsable) {
 				if (isLoginPage) {
-					if (await request.initialConfig.status.finished()) {
+					if (await isConfigDone()) {
 						tools.navigateTo.originalPage();
 					}
 					else {
@@ -205,7 +217,7 @@ export const init = (sessionNeeded = false, isLoginPage = false, isInitialSetup 
 			if (isUsable) {
 				if (! changingPage) {
 					if (serverNeeded) {
-						if (! (await request.initialConfig.status.finished())) {
+						if (! (await isConfigDone())) {
 							if (! isInitialSetup) {
 								tools.navigateTo.anotherTemporary("initial-setup");
 							}
@@ -278,7 +290,7 @@ const sendRequest = {
 		return res === "true";
 	},
 
-	postJSON: async (path, value, ignoreNonOk) => {
+	postJSON: async (path, value, responseIsText = false, ignoreNonOk) => {
 		const res = await standardFetch(path, {
 			method: "POST",
 			headers: {
@@ -288,7 +300,7 @@ const sendRequest = {
 			body: JSON.stringify(value)
 		}, ignoreNonOk);
 
-		if (res.ok) return await res.json();
+		if (res.ok && (! responseIsText)) return await res.json();
 		return await res.text();
 	}
 };
@@ -315,7 +327,7 @@ export const request = {
 				commandDone();
 			},
 			initial: async newPassword => {
-				await initIfNeeded(false);
+				await initIfNeeded();
 
 				session = (await sendRequest.postJSON("/password/change/initial", {
 					newPassword
@@ -325,10 +337,32 @@ export const request = {
 			}
 		}
 	},
+	cors: {
+		status: {
+			clientDomainsConfigured: async _ => {
+				await initIfNeeded();
+
+				const result = await sendRequest.getBool("/cors/status/clientDomainsConfigured");
+
+				commandDone();
+				return result;
+			}
+		},
+		change: async domains => {
+			await initIfNeeded();
+
+			const result = await sendRequest.postJSON("/cors/change", {
+				domains
+			}, true);
+
+			commandDone();
+			return result; 
+		}
+	},
 	initialConfig: {
 		status: {
 			finished: async _ => {
-				await initIfNeeded(false);
+				await initIfNeeded();
 	
 				const result = await sendRequest.getBool("/initialConfig/status/finished");
 				commandDone();
@@ -339,7 +373,7 @@ export const request = {
 	login: {
 		status: {
 			check: async _ => {
-				await initIfNeeded(false);
+				await initIfNeeded(false); // It's fine if we're not logged in
 
 				// The server will send a non ok if we're not logged in, so the true prevents the usual handling so it doesn't trigger an error the user sees
 				const res = await sendRequest.getText("/login/status/check", true);

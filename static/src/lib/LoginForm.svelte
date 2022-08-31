@@ -1,6 +1,7 @@
 <script>
 	import * as backend from "$util/Backend.js";
 	const { request } = backend;
+	import { format } from "$util/Tools.js";
 
 	let domain;
 	$: domainChanged = domain == domain;
@@ -51,7 +52,7 @@
 
 		domainChanged = false;
 		console.log("=", checkServerTask)
-		checkServerTask = backend.changeServerURL(domain.includes("://")? domain : "https://" + domain);
+		checkServerTask = backend.changeServerURL(format.url(domain));
 		console.log("+", checkServerTask)
 		if (shouldCheckDisplayMode) checkPasswordDisplayMode();
 		return checkServerTask;

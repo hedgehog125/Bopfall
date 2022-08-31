@@ -1,15 +1,11 @@
 <script>
 	import Toast from "$util/Toast.svelte";
 	import LoginForm from "$lib/LoginForm.svelte";
-
-	import * as backend from "$util/Backend.js";
-	import { onMount } from "svelte";
-	onMount(_ => {
-		backend.init(false, true);
-	});
+	import BackendInit from "$util/BackendInit.svelte";
 </script>
 
 <main>
+	<BackendInit specialPage="login"></BackendInit>
 	<Toast></Toast>
 	<LoginForm></LoginForm>
 </main>

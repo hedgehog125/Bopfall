@@ -283,6 +283,8 @@ const startServer = {
 
 			config.main.clientDomains = req.body.domains;
 			filesUpdated.config = true;
+
+			res.send();
 		});
 		app.get("/cors/status/clientDomainsConfigured", (req, res) => {
 			res.send((config.main.clientDomains.length != 0).toString());
@@ -296,6 +298,8 @@ const startServer = {
 
 			config.main.directStorage = enable;
 			filesUpdated.config = true;
+
+			res.send();
 		});
 		app.get("/directStorage/status/supported", (req, res) => {
 			res.send(storageInfo.directStorage.supported.toString());

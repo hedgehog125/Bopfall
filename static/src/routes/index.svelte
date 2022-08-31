@@ -1,12 +1,7 @@
 <script>
-	import * as backend from "$util/Backend.js";
-	import { onMount } from "svelte";
-
-	onMount(_ => {
-		backend.init();
-	});
+	import BackendInit from "$util/BackendInit.svelte";
 </script>
 
 <main>
-	
+	<BackendInit></BackendInit>
 </main>

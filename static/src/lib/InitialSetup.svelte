@@ -1,7 +1,9 @@
 <script>
 	import { request } from "$util/Backend.js";
+	import { onMount } from "svelte";
 
-	import ChangePassword from "$util/ChangePassword.svelte";
+	import ChangePassword from "$set/ChangePassword.svelte";
+	import ChangeCors from "$set/ChangeCors.svelte";
 
 	import backIcon from "$img/back.svg";
 
@@ -13,11 +15,15 @@
 	$: completeRevisit = revisit && stepsCompleted == stepCount;
 	$: backLocked = step == 0;
 
+	let loading = true;
+	let passwordSet, corsSet;
 	const load = async _ => {
-		let passwordSet;
 		await Promise.all([
 			(async _ => {
 				passwordSet = await request.password.status.set();
+			})(),
+			(async _ => {
+				corsSet = await request.cors.status.clientDomainsConfigured();
 			})()
 		]);
 
@@ -25,7 +31,7 @@
 		if (true) {
 			step = 2;
 		}
-		if (true) {
+		if (! corsSet) {
 			step = 1;
 		}
 		if (! passwordSet) {
@@ -33,7 +39,10 @@
 		}
 
 		stepsCompleted = step;
+		loading = false;
 	};
+	onMount(load);
+
 	const back = _ => {
 		step--;
 		revisit = true;
@@ -57,19 +66,13 @@
 
 	};
 
-	const handlePasswordStateKnown = passwordSet => {
-		if (passwordSet && (! revisit)) {
-			stepComplete();
-		}
-	};
-
 	export let toast;
 </script>
 
 <main>
-	{#await load()}
+	{#if loading}
 		TODO: loading symbol with SmoothVisible
-	{:then}
+	{:else}
 
 		{#if completeRevisit || step == stepCount}
 			{#if step == stepCount}
@@ -99,9 +102,9 @@
 
 		{#if step != stepCount}
 			{#if step == 0}
-				<ChangePassword {toast} handleStateKnown={handlePasswordStateKnown} handleFinish={stepComplete}></ChangePassword>
+				<ChangePassword {toast} {passwordSet} handleFinish={stepComplete}></ChangePassword>
 			{:else if step == 1}
-				Step 2
+				<ChangeCors {corsSet} handleFinish={stepComplete}></ChangeCors>
 			{:else}
 				Step 3
 			{/if}
@@ -111,7 +114,7 @@
 			</span>
 		{/if}
 
-	{/await}
+	{/if}
 </main>
 
 <style> 

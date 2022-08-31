@@ -24,6 +24,7 @@ under Apache License 2.0
 
 == Icons ==
 Back (and forwards which is just a flipped back. And cropped to remove blank area): Material icon, arrow left, Google
+Close/X: Material icon, close, Google
 
 == Misc ==
 Password comic: https://xkcd.com/936/ under CC BY-NC 2.5

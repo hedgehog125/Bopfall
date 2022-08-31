@@ -18,8 +18,9 @@ const config = {
 		},
 		alias: {
 			$util: "src/lib/util",
+			$set: "src/lib/settings",
 			$img: "src/lib/imgs",
-			$sng: "src/lib/snds",
+			$snd: "src/lib/snds",
 			$vid: "src/lib/vids"
 		},
 

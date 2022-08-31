@@ -20,7 +20,8 @@ export const format = {
 		if (text.length < limit) return text;
 
 		return text.slice(0, limit - 3) + "...";
-	}
+	},
+	url: url => url.includes("://")? url : "https://" + url
 };
 export const timing = {
 	setTimeoutOrImmediate: (callback, delay, ...params) => {

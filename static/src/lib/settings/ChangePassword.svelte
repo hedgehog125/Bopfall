@@ -1,14 +1,16 @@
 <script>
 	import { request } from "$util/Backend.js";
+	import { onMount } from "svelte";
 
 	import passwordImage from "$img/passwordStrength.png";
 
-	let passwordSet;
+	let loading = true;
 	const load = async _ => {
-		passwordSet = await request.password.status.set();
+		if (passwordSet == null) passwordSet = await request.password.status.set();
 
-		handleStateKnown?.(passwordSet);
+		loading = false;
 	};
+	onMount(load);
 
 	let lockForm = false;
 	let oldPassword;
@@ -50,29 +52,30 @@
 		}
 	};
 
-	export let handleStateKnown = null;
+	export let passwordSet = null;
 	export let handleFinish;
 	export let toast;
 </script>
 
 <main>
-	{#await load()}
+	{#if loading}
 		TODO: use SmoothVisible
-	{:then}
+	{:else}
+	
 		<form on:submit|preventDefault={handlePasswordChange} autocomplete="on">
 			{#if passwordSet}
 				<section>
 					<label for="oldPassword">Old password:</label> <br>
-					<input type="password" required bind:value={oldPassword} placeholder="Enter your current password..." name="password" autocomplete="current-password" id="oldPassword">
+					<input type="password" required bind:value={oldPassword} disabled={lockForm} placeholder="Enter your current password..." name="password" autocomplete="current-password" id="oldPassword">
 					<br><br>
 				</section>
 			{/if}
 			<section>
 				<label for="newPassword">New password:</label> <br>
-				<input type="password" required bind:value={newPassword} placeholder="Enter your new password..." autocomplete="new-password" id="newPassword">
+				<input type="password" required bind:value={newPassword} disabled={lockForm} placeholder="Enter your new password..." autocomplete="new-password" id="newPassword">
 				<br>
 				<label for="newPasswordAgain">And repeated:</label> <br>
-				<input type="password" required bind:value={newPasswordAgain} placeholder="Your new password again..." autocomplete="new-password" id="newPasswordAgain">
+				<input type="password" required bind:value={newPasswordAgain} disabled={lockForm} placeholder="Your new password again..." autocomplete="new-password" id="newPasswordAgain">
 			</section>
 
 			<br>
@@ -92,7 +95,8 @@
 				Credit: <a href="https://xkcd.com/936/" rel="external">xkcd</a>.
 			</span>
 		</div>
-	{/await}
+
+	{/if}
 </main>
 
 <style>
