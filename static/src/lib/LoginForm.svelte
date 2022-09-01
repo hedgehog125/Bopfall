@@ -38,7 +38,8 @@
 			console.log("F")
 		}
 		if (ok) {
-			backend.login(password, displayAsSetupCode).catch(_ => {
+			backend.login(password, displayAsSetupCode).catch(er => {
+				console.log(er)
 				lockForm = false;
 			});
 		}

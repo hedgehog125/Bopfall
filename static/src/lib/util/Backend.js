@@ -58,7 +58,8 @@ const ERRORS = {
 	IncorrectPassword: "Incorrect password",
 	IncorrectSetup: "Wrong setup code",
 	NoServerURL: INTERNAL_ERROR,
-	BoolIsNull: IGNORE_ERROR
+	BoolIsNull: IGNORE_ERROR,
+	LoginNeeded: IGNORE_ERROR
 };
 
 
@@ -236,7 +237,7 @@ export const init = (sessionNeeded = false, specialPage) => {
 
 };
 export const login = async (password, isSetupCode) => {
-	await initIfNeeded();
+	await initIfNeeded(false);
 
 	if (isSetupCode == null) isSetupCode = await request.password.status.set();
 
@@ -250,6 +251,9 @@ export const login = async (password, isSetupCode) => {
 			session
 		}
 	}, true);
+
+	// It's usable by this point as there's a new session but the cached result of init was probably false (not usable). Instead of doing another initialisation which isn't necessary as things are already loaded, we'll just modify the cached output
+	tasks.init = Promise.resolve(true);
 
 	if (! shouldStopNextDefault) {
 		if (await request.initialConfig.status.finished()) {

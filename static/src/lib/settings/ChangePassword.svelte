@@ -17,11 +17,11 @@
 	let newPassword, newPasswordAgain;
 	const handlePasswordChange = async _ => {
 		if (newPassword != newPasswordAgain) {
-			toast("Confirm password doesn't match", undefined, true);
+			toast("Confirm password doesn't match");
 			return;
 		}
 		if (newPassword.length < 8) {
-			toast("Password needs at least 8 characters", undefined, true);
+			toast("Password needs at least 8 characters");
 			return;
 		}
 		if (newPassword.length > 128) {
