@@ -16,6 +16,7 @@ Commit the previous state of files using a backup/prefix on error, then set some
 Add backendErrorCaught function that sets shouldStopNextDefault back to its previous value. Should be called every time a BackendError is caught internally in the Backend module
 
 = Stability =
+Delete idb on server change, and prompt if there's more than a few files cached
 Catch file errors and handle them where possible
 Send server version in /info and have client check it in the background on connect, then error if incompatible. Maybe have syntax version?
 Handle wasUpgradingTo not being -1

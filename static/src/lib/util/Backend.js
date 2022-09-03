@@ -142,7 +142,7 @@ export const changeServerURL = value => {
 	return promise;
 };
 
-let db;
+let db, cached;
 export const init = (sessionNeeded = false, specialPage) => {
 	const promise = (async _ => {
 		const isLoginPage = specialPage == "login";
@@ -153,6 +153,7 @@ export const init = (sessionNeeded = false, specialPage) => {
 				db.createObjectStore("files");
 				db.createObjectStore("metadata");
 				db.createObjectStore("misc");
+				db.createObjectStore("cache");
 	
 				await tools.db.writeParrelel(db, {
 					misc: {
@@ -163,6 +164,9 @@ export const init = (sessionNeeded = false, specialPage) => {
 						versionStored: -1,
 						wasUpgradingTo: -1, // Set during a sync so if the tab's closed, the right files can be discarded and syncing can continue/restart. Set to -1 when all done
 						knownVersion: -1
+					},
+					cache: {
+						configDone: null
 					}
 				}, false, transaction);
 			}
@@ -176,9 +180,14 @@ export const init = (sessionNeeded = false, specialPage) => {
 		});
 		serverURL = read.serverURL;
 		session = read.session;
+		cached = await tools.db.readParrelel(db, {
+			cache: [
+				"configDone"
+			]
+		});
 	
 		// Because it hasn't initialised yet, the proper functions can't be used
-		const isConfigDone = async _ => await sendRequest.getBool("/initialConfig/status/finished");
+		const isConfigDone = isConfigDoneInternal;
 		const isLoggedIn = async _ => {
 			const res = await sendRequest.getText("/login/status/check", true);
 
@@ -268,6 +277,20 @@ export const login = async (password, isSetupCode) => {
 	commandDone();
 };
 
+const updateCache = (id, value) => { // Not async since this can happen in the background
+	cached[id] = value;
+	db.put("cache", value, id);
+};
+const isConfigDoneInternal = async _ => {
+	if (cached.configDone != null) {
+		commandDone();
+		return cached.configDone;
+	}
+
+	const result = await sendRequest.getBool("/initialConfig/status/finished");
+	if (result) updateCache("configDone", true); // Only cache if it's true since it won't change back
+	return result;
+};
 const sendRequest = {
 	getText: async (path, ignoreNonOk) => {
 		return await (await standardFetch(path, {
@@ -401,8 +424,8 @@ export const request = {
 		status: {
 			finished: async _ => {
 				await initIfNeeded();
-	
-				const result = await sendRequest.getBool("/initialConfig/status/finished");
+				
+				const result = await isConfigDoneInternal();
 				commandDone();
 				return result;
 			}
