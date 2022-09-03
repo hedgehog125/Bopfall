@@ -9,8 +9,6 @@
 	const load = async _ => {
 		domains = [location.origin];
 
-		if (corsSet == null) corsSet = await request.cors.status.clientDomainsConfigured();
-
 		loading = false;
 	};
 	onMount(load);
@@ -48,7 +46,6 @@
 		}
 	};
 
-	export let corsSet = null;
 	export let handleFinish;
 </script>
 
@@ -85,16 +82,13 @@
 			<section>
 				<label for="domain">Add another domain:</label> <br>
 				<input type="text" required bind:value={domain} disabled={lockForm} placeholder="Enter a domain..." id="domain">
-			</section>
-
-			<section>
 				<button type="submit" disabled={lockForm}>Add</button>
 			</section>
 		</form>
 
 		<br>
 		<form on:submit|preventDefault={handleCorsChange}>
-			<button type="submit" disabled={lockForm}>{corsSet? "Change client domains" : "Set client domains"}</button>
+			<button type="submit" disabled={lockForm}>ok</button>
 		</form>
 	{/if}
 </main>

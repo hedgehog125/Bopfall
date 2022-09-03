@@ -1,5 +1,5 @@
 <script>
-	import { request } from "$util/Backend.js";
+	import { request, getServerURL } from "$util/Backend.js";
 	import { onMount } from "svelte";
 
 	import passwordImage from "$img/passwordStrength.png";
@@ -62,7 +62,14 @@
 		TODO: use SmoothVisible
 	{:else}
 	
+		<h2>
+			Choose a password
+		</h2>
+
 		<form on:submit|preventDefault={handlePasswordChange} autocomplete="on">
+			<section>
+			</section>
+
 			{#if passwordSet}
 				<section>
 					<label for="oldPassword">Old password:</label> <br>

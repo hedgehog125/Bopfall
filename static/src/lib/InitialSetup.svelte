@@ -1,11 +1,14 @@
 <script>
 	import { request } from "$util/Backend.js";
+	import { navigateTo } from "$util/Tools.js";
 	import { onMount } from "svelte";
 
 	import ChangePassword from "$set/ChangePassword.svelte";
 	import ChangeCors from "$set/ChangeCors.svelte";
+	import DirectStorage from "$set/DirectStorage.svelte";
 
 	import backIcon from "$img/back.svg";
+	import editIcon from "$img/pencil.svg";
 
 	let step = 0;
 	let stepsCompleted = 0;
@@ -15,23 +18,14 @@
 	$: completeRevisit = revisit && stepsCompleted == stepCount;
 	$: backLocked = step == 0;
 
-	let loading = true;
-	let passwordSet, corsSet;
-	const load = async _ => {
-		await Promise.all([
-			(async _ => {
-				passwordSet = await request.password.status.set();
-			})(),
-			(async _ => {
-				corsSet = await request.cors.status.clientDomainsConfigured();
-			})()
-		]);
-
+	const findStep = _ => {
 		step = stepCount;
-		if (true) {
-			step = 2;
+		if (corsSet) { // These only have valid data if CORS is configured
+			if (directStorageStatus.enabledByConfig == null) {
+				step = 2;
+			}
 		}
-		if (! corsSet) {
+		else {
 			step = 1;
 		}
 		if (! passwordSet) {
@@ -39,20 +33,67 @@
 		}
 
 		stepsCompleted = step;
+	};
+
+	let loading = true;
+	let afterCorsLoaded = false;
+	let passwordSet, corsSet, directStorageStatus;
+	const load = async _ => {
+		{
+			const promises = [
+				request.password.status.set(),
+				request.cors.status.clientDomainsConfigured()
+			];
+			passwordSet = await promises[0];
+			corsSet = await promises[1];
+		}
+		if (corsSet) { // These can only be loaded if CORS has been configured already
+			await loadAfterCorsData();
+		}
+
+		findStep();
+		
 		loading = false;
 	};
 	onMount(load);
+	const loadAfterCorsData = async _ => {
+		const promises = [
+			request.directStorage.status.all()
+		];
+		directStorageStatus = await promises[0];
+
+		afterCorsLoaded = true;
+	};
 
 	const back = _ => {
 		step--;
-		revisit = true;
-	};
-	const next = _ => { // Going ahead without completing steps is prevented with the button locking as opposed to something in here
-		if (step == stepCount) {
 
+		revisit = true;
+		updateStepCache();
+	};
+	const updateStepCache = _ => {
+		// Update or invalidate the cached server state for each of the steps
+		if (step == 0) passwordSet = true;
+		else if (step == 1) corsSet = true;
+		else if (step == 2) directStorageStatus = null;
+	};
+	const next = async _ => { // Going ahead without completing steps is prevented with the button locking as opposed to something in here
+		if (step == stepCount) return;
+
+		if (completeRevisit) {
+			ok();
 		}
 		else if (step == stepsCompleted) { // The first step that hasn't been completed yet
 			revisit = false;
+		}
+		else if (step == 1) { // CORS has just been configured
+			if (afterCorsLoaded) {
+				loading = true;
+				await loadAfterCorsData();
+				loading = false;
+			}
+
+			step = 2;
 		}
 		else {
 			step++;
@@ -62,8 +103,42 @@
 		stepsCompleted++;
 		next();
 	};
-	const ok = _ => {
 
+	let initialConfigDone = false;
+	const finishConfig = async _ => {
+		if (! initialConfigDone) {
+			loading = true;
+			
+			let ok = true;
+			try {
+				await request.initialConfig.finish();
+			}
+			catch {
+				ok = false;
+			}
+
+			loading = false;
+			if (! ok) return;
+			initialConfigDone = true;
+		}
+	};
+	const revisitStep = async _step => {
+		await finishConfig();
+
+		step = _step;
+		revisit = true;
+		updateStepCache();
+	};
+	const ok = async _ => {
+		await finishConfig();
+
+		if (revisit) {
+			step = stepCount;
+			revisit = false;
+		}
+		else {
+			navigateTo.originalPage();
+		}
 	};
 
 	export let toast;
@@ -80,53 +155,66 @@
 					Does that all look good?
 				</h1> <br> <br>
 			{/if}
-			<button class="ok" on:click={ok}>
+			<button class="ok bottomRow" on:click={ok}>
 				<div>
 					<span>Ok</span>
 				</div>
 			</button>
 		{:else}
-			<button class="back" on:click={back} disabled={backLocked}>
+			<button class="back bottomRow" on:click={back} disabled={backLocked}>
 				<div>
 					<img src={backIcon} alt="" width=16 height=16> <!-- Alt attribute would just be repeating the span -->
 					<span>Back</span>
 				</div>
 			</button>
-			<button class="next" on:click={next} disabled={step >= stepsCompleted}>
+			<button class="next bottomRow" on:click={next} disabled={step >= stepsCompleted}>
 				<div>
 					<span>Next</span>
 					<img src={backIcon} class="flipped" alt="" width=16 height=16>
 				</div>
 			</button>
-		{/if}
-
-		{#if step != stepCount}
-			{#if step == 0}
-				<ChangePassword {toast} {passwordSet} handleFinish={stepComplete}></ChangePassword>
-			{:else if step == 1}
-				<ChangeCors {corsSet} handleFinish={stepComplete}></ChangeCors>
-			{:else}
-				Step 3
-			{/if}
 
 			<span class="progress">
 				Step {step + 1} of {stepCount}
 			</span>
 		{/if}
 
+		{#if step == stepCount}
+			{#each [
+				"Password",
+				"Client domains",
+				"Direct storage access"
+			] as stepName, index}
+				<span>{stepName}</span>
+				<button on:click={_ => {revisitStep(index)}}>
+					<img src={editIcon} alt="Edit" width=16 height=16>
+				</button>
+				<br>
+			{/each}
+		{:else}
+			{#if step == 0}
+				<ChangePassword {toast} {passwordSet} handleFinish={stepComplete}></ChangePassword>
+			{:else if step == 1}
+				<ChangeCors handleFinish={stepComplete}></ChangeCors>
+			{:else}
+				<DirectStorage {directStorageStatus} handleFinish={stepComplete}></DirectStorage>
+			{/if}
+		{/if}
+
 	{/if}
 </main>
 
-<style> 
+<style>
 	button {
-		position: absolute;
-		bottom: 15px;
-
 		background-color: #EFEFEF;
 
 		border: 2px solid black;
 		border-radius: 5px;
 		box-shadow: 1.5px 1.5px 3px #000000BB;
+	}
+	.bottomRow {
+		position: absolute;
+		bottom: 15px;
 	}
 	button > div {
 		display: flex;

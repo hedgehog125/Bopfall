@@ -12,22 +12,18 @@
 	let lockForm = false;
 
 	const handleLogin = async _ => {
-		console.log("A")
 		lockForm = true;
 		
 		let ok = true;
 		if (checkServerTask) {
-			console.log("D")
 			try {
 				await checkServerTask;
 			}
 			catch {
 				ok = false;
 			}
-			console.log("E")
 		}
 		if (domainChanged) {
-			console.log("C")
 			ok = true;
 			try {
 				await changeDomain(false);
@@ -35,11 +31,9 @@
 			catch {
 				ok = false;
 			}
-			console.log("F")
 		}
 		if (ok) {
-			backend.login(password, displayAsSetupCode).catch(er => {
-				console.log(er)
+			backend.login(password, displayAsSetupCode).catch(_ => {
 				lockForm = false;
 			});
 		}
@@ -52,9 +46,7 @@
 		if (domain == "" || domain == null) return;
 
 		domainChanged = false;
-		console.log("=", checkServerTask)
 		checkServerTask = backend.changeServerURL(format.url(domain));
-		console.log("+", checkServerTask)
 		if (shouldCheckDisplayMode) checkPasswordDisplayMode();
 		return checkServerTask;
 	};
@@ -62,9 +54,7 @@
 	const checkPasswordDisplayMode = async _ => {
 		let ok = true;
 		try {
-			console.log("-", checkServerTask)
 			await checkServerTask;
-			console.log("G")
 		}
 		catch {
 			ok = false;

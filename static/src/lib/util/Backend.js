@@ -51,7 +51,7 @@ const INTERNAL_ERROR = "A unhandled error occurred";
 const IGNORE_ERROR = "";
 const ERRORS = {
 	Unknown: "Unknown error",
-	Network: "Network error",
+	Network: "Network error (CORS?)",
 	CantConnect: "Unable to connect to the sever (CORS?)",
 	NotBopfall: "Not a bopfall server",
 	StartFailed: "Server failed to start",
@@ -59,7 +59,9 @@ const ERRORS = {
 	IncorrectSetup: "Wrong setup code",
 	NoServerURL: INTERNAL_ERROR,
 	BoolIsNull: IGNORE_ERROR,
-	LoginNeeded: IGNORE_ERROR
+	LoginNeeded: IGNORE_ERROR,
+	DirectStorageNotSupported: "Direct storage access isn't supported by this server",
+	SomeNotConfigured: "Some of the initial config isn't done. Somehow...?"
 };
 
 
@@ -83,6 +85,7 @@ export const stopNextDefault = _ => {
 };
 
 let serverURL;
+export const getServerURL = _ => serverURL;
 let newServerURL; // Is a global so it can also be checked against for double sets
 let session;
 export const changeServerURL = value => {
@@ -97,8 +100,7 @@ export const changeServerURL = value => {
 		try {
 			res = await fetch(newServerURL + "/info");
 		}
-		catch (error) {
-			console.log(error)
+		catch {
 			throw new BackendError("CantConnect");
 		}
 
@@ -133,7 +135,6 @@ export const changeServerURL = value => {
 
 		serverURL = newServerURL;
 
-		console.log("B")
 		progress.check++;
 		commandDone();
 	})();
@@ -306,6 +307,17 @@ const sendRequest = {
 
 		if (res.ok && (! responseIsText)) return await res.json();
 		return await res.text();
+	},
+	postText: async (path, value, ignoreNonOk) => {
+		const res = await standardFetch(path, {
+			method: "POST",
+			headers: {
+				"Content-Type": "text/plain",
+				"Authorization": "sessionid " + session
+			},
+			body: value
+		}, ignoreNonOk);
+		return await res.text();
 	}
 };
 export const request = {
@@ -363,6 +375,28 @@ export const request = {
 			return result; 
 		}
 	},
+	directStorage: {
+		status: {
+			all: async _ => {
+				await initIfNeeded();
+
+				const result = await sendRequest.getJSON("/directStorage/status/all");
+
+				commandDone();
+				return result;
+			}
+		},
+		change: async enable => {
+			await initIfNeeded();
+
+			const result = await sendRequest.postJSON("/directStorage/change", {
+				enable
+			}, true);
+
+			commandDone();
+			return result;
+		}
+	},
 	initialConfig: {
 		status: {
 			finished: async _ => {
@@ -372,6 +406,12 @@ export const request = {
 				commandDone();
 				return result;
 			}
+		},
+		finish: async _ => {
+			await initIfNeeded();
+	
+			await sendRequest.postText("/initialConfig/finish", "");
+			commandDone();
 		}
 	},
 	login: {

@@ -63,10 +63,11 @@ export const navigateTo = {
 		goto(url);
 	},
 	originalPage: _ => {
-		const params = new URL(location.href).searchParams;
+		const url = new URL(location.href);
 
-		let returnPage = params.get("returnTo");
-		if (returnPage == null) returnPage = "";
+		let returnPage = url.searchParams.get("returnTo");
+		if (returnPage == null || returnPage == url.pathname) returnPage = "";
+		else if (returnPage[0] == "/") returnPage = returnPage.slice(1);
 
 		goto(linkPage(returnPage));
 	},

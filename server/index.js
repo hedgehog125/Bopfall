@@ -23,6 +23,7 @@ Handle wasUpgradingTo not being -1
 = Tweaks =
 Display toast on network change
 
+Make the buttons in the initial setup a component and remove the inner div somehow?
 Move parts of the code into tools.js
 Port Bagel.js' check function, remove some parts of it and make it part of jsonPlus
 Create separate routes.js file
@@ -121,7 +122,6 @@ const MAIN_FILES = [
 	["musicIndex", _ => musicIndex, value => {musicIndex = value}]
 ];
 const SECONDS_TO_MS = 1000;
-const MINUTES_TO_MS = SECONDS_TO_MS * 60;
 
 const startServer = {
 	basic: _ => {
@@ -156,6 +156,7 @@ const startServer = {
 				"/directStorage/status/enabledByModule",
 				"/directStorage/status/enabledByConfig",
 				"/directStorage/status/active",
+				"/directStorage/status/all",
 
 				"/initialConfig/finish"
 			],
@@ -283,6 +284,7 @@ const startServer = {
 
 			config.main.clientDomains = req.body.domains;
 			filesUpdated.config = true;
+			corsAndAuth.update.clientDomains();
 
 			res.send();
 		});
@@ -301,18 +303,30 @@ const startServer = {
 
 			res.send();
 		});
-		app.get("/directStorage/status/supported", (req, res) => {
-			res.send(storageInfo.directStorage.supported.toString());
-		});
-		app.get("/directStorage/status/enabledByModule", (req, res) => {
-			res.send(storageInfo.directStorage.enabled.toString());
-		});
-		app.get("/directStorage/status/enabledByConfig", (req, res) => {
-			res.send(tools.stringifyNullableBool(config.main.directStorage));
-		});
-		app.get("/directStorage/status/active", (req, res) => {
-			res.send((storageInfo.directStorage.enabled && config.main.directStorage).toString());
-		});
+		{
+			const isActive = _ => storageInfo.directStorage.enabled && config.main.directStorage;
+			app.get("/directStorage/status/supported", (req, res) => {
+				res.send(storageInfo.directStorage.supported.toString());
+			});
+			app.get("/directStorage/status/enabledByModule", (req, res) => {
+				res.send(storageInfo.directStorage.enabled.toString());
+			});
+			app.get("/directStorage/status/enabledByConfig", (req, res) => {
+				res.send(tools.stringifyNullableBool(config.main.directStorage));
+			});
+			app.get("/directStorage/status/active", (req, res) => {
+				res.send(isActive().toString());
+			});
+			app.get("/directStorage/status/all", (req, res) => {
+				const { supported, enabled, secured } = storageInfo.directStorage;
+				res.json({
+					supported,
+					enabled,
+					enabledByConfig: config.main.directStorage,
+					active: isActive()
+				});
+			});
+		}
 
 		app.post("/initialConfig/finish", (req, res) => {
 			const passwordSet = state.persistent.auth.passwordSet;
@@ -419,7 +433,9 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 
 			let tasks = [];
 			for (let [fileName, _, setValue] of MAIN_FILES) {
-				setValue(await setJSONToDefault(fileName + ".json"));
+				tasks.push((async _ => {
+					setValue(await setJSONToDefault(fileName + ".json"));
+				})());
 			}
 			await Promise.all(tasks);
 
@@ -437,22 +453,6 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 		config: async _ => {
 			if (config.main == null) {
 				config.main = await loadJSON("config.json");	
-			}
-
-			{
-				const timings = config.main.timings;
-				timings.commitInterval *= SECONDS_TO_MS;
-				{
-					const auth = timings.auth;
-
-					const failedLogin = auth.failedLogin;
-					failedLogin.normal *= SECONDS_TO_MS;
-					failedLogin.increased *= SECONDS_TO_MS;
-
-					const validFor = auth.validFor;
-					validFor.normal *= MINUTES_TO_MS;
-					validFor.initial *= MINUTES_TO_MS;
-				}
 			}
 		},
 		state: async _ => {
