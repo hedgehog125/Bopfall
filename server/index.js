@@ -15,11 +15,16 @@ Commit the previous state of files using a backup/prefix on error, then set some
 
 Add backendErrorCaught function that sets shouldStopNextDefault back to its previous value. Should be called every time a BackendError is caught internally in the Backend module
 
+Files seem to be made in a random order? Check the fileIndex and compare with the order of MAIN_FILES
+
 = Stability =
 Delete idb on server change, and prompt if there's more than a few files cached
 Catch file errors and handle them where possible
 Send server version in /info and have client check it in the background on connect, then error if incompatible. Maybe have syntax version?
 Handle wasUpgradingTo not being -1
+
+Fallback to accessing via server on 404. A music file might have been deleted but the new metadata hasn't been saved yet
+Checks and recovery logic on sync
 
 = Tweaks =
 Display toast on network change
@@ -30,6 +35,8 @@ Port Bagel.js' check function, remove some parts of it and make it part of jsonP
 Create separate routes.js file
 Await any start result then stop handling request if invalid
 writeParrelel should create a transaction for all the writes. Maybe for readParrelel as well?
+
+Rename to SoundDrop. The logo/loading animation is a stream that fills up because of the drops, until it's full which is 100%. The stream is continuous throughout
 
 = Optimisations =
 Preload images
@@ -44,6 +51,8 @@ Implement the fail counter and fail delays. Measure from when the check started 
 Add shaking animation on error in forms
 Give proper error when the port is already being used
 Update credits to include new packages
+
+ChangeCors should load existing domains if configured
 
 */
 
@@ -81,6 +90,7 @@ let server;
 
 import * as bcrypt from "bcrypt";
 import * as musicMetadata from "music-metadata";
+import * as mime from "mime-types";
 import { createTerminus } from "@godaddy/terminus";
 
 const state = {
@@ -107,7 +117,7 @@ const filesUpdated = {
 	musicIndex: false,
 	login: false
 };
-let info, musicIndex;
+let info, musicIndex, musicIndexVersion;
 
 const PORT = process.env.PORT?? 8000; // Loaded as part of config or from the environment variable
 const LATEST_VERSIONS = {
@@ -117,10 +127,11 @@ const LATEST_VERSIONS = {
 	state: 1
 };
 const MAIN_FILES = [
-	["info", _ => info, value => {info = value}],
-	["config", _ => config.main, value => {config.main = value}],
-	["state", _ => state.persistent, value => {state.persistent = value}],
-	["musicIndex", _ => musicIndex, value => {musicIndex = value}]
+	["info", "json", _ => info, value => {info = value}],
+	["config", "json", _ => config.main, value => {config.main = value}],
+	["state", "json", _ => state.persistent, value => {state.persistent = value}],
+	["musicIndex", "json", _ => musicIndex, value => {musicIndex = value}],
+	["musicIndexVersion", "txt", _ => musicIndexVersion, value => {musicIndexVersion = value}]
 ];
 const SECONDS_TO_MS = 1000;
 
@@ -346,7 +357,54 @@ const startServer = {
 			res.send(state.persistent.initialConfigDone.toString());
 		});
 
+
+
+		{
+			const DENY = tools.indexArray(["state.json"]);
+			const IN_MEMORY = (_ => {
+				const index = Object.create(null, {});
+				for (let [name, extension, value] of MAIN_FILES) {
+					let fileName = name + "." + extension;
+					index[fileName] = value;
+				}
+				return index;
+			})();
+			app.use("/file/get/", async (req, res, next) => {
+				if (req.method != "GET") return next();
+
+				const path = req.path.slice(1);
+				if (DENY[path]) {
+					res.status(403).send("ServerOnly");
+					return;
+				}
+
+				{
+					const mainFileValue = IN_MEMORY[path];
+					if (mainFileValue) {
+						res.setHeader("Content-Type", mime.contentType(path));
+						res.send(mainFileValue());
+						return;
+					}
+				}
+
+				let data;
+				try {
+					data = await storage.readFile(path);
+				}
+				catch {
+					res.status(404).send("NotFound");
+					return;
+				}
+
+				res.setHeader("Content-Type", mime.contentType(path) || "text/plain; charset=utf-8");
+				res.send(data);
+			});
+		}
 	
+		app.use((req, res, next) => { // Sends a 200 code for preflights with no endpoints to reduce confusion as that request should be fine (it passed CORS checks earlier)
+			if (req.method == "OPTIONS") res.send();
+			else next();
+		});
 		let startTime = (performance.now() - startTimestamp) / 1000;
 		server = app.listen(PORT, _ => {
 			console.log(
@@ -387,8 +445,11 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 			await load.info();
 			await setup.initialFiles();
 
-			await load.config();
-			await load.state();
+			await Promise.all([
+				load.config(),
+				load.state(),
+				load.musicIndex()
+			]);
 		}
 
 		setInterval(tick, 1000);
@@ -433,9 +494,10 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 			if (info.initialFilesMade) return;
 
 			let tasks = [];
-			for (let [fileName, _, setValue] of MAIN_FILES) {
+			for (let [name, extension, _, setValue] of MAIN_FILES) {
+				const fileName = name + "." + extension;
 				tasks.push((async _ => {
-					setValue(await setJSONToDefault(fileName + ".json"));
+					setValue(await setJSONToDefault(fileName));
 				})());
 			}
 			await Promise.all(tasks);
@@ -465,6 +527,14 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 				const auth = state.persistent.auth;
 				auth.sessions = new Map(Object.entries(auth.sessions)); // Convert to map
 			}
+		},
+		musicIndex: async _ => {
+			if (musicIndex == null) {
+				musicIndex = await loadJSON("musicIndex.json");
+			}
+			if (musicIndexVersion == null) {
+				musicIndexVersion = await storage.readFile("musicIndexVersion.txt");
+			}
 		}
 	}
 }
@@ -478,8 +548,9 @@ const periodicCommit = async _ => {
 };
 const commit = async _ => {
 	let tasks = [];
-	for (let [fileName, value] of MAIN_FILES) {
-		if (filesUpdated[fileName]) {
+	for (let [name, extension, value] of MAIN_FILES) {
+		const fileName = name + "." + extension;
+		if (filesUpdated[name]) {
 			value = value();
 			value = JSON.stringify(value, (key, subValue) => {
 				if (subValue instanceof Map) {
@@ -489,22 +560,34 @@ const commit = async _ => {
 			});
 
 			tasks.push((async _ => {
-				await storage.writeFile(fileName + ".json", value);
+				await storage.writeFile(fileName, value);
 				if (config.main.log.debug) {
 					console.log(`Committed ${fileName}.json`);
 				}
 			})());
-			filesUpdated[fileName] = false;
+			filesUpdated[name] = false;
 		}
 	}
 	await Promise.all(tasks);
 };
 const shutdown = async _ => {
-	console.log("Committing files...\n");	
+	const numberToCommit = MAIN_FILES.filter(([ name ]) => filesUpdated[name]).length;
+	if (numberToCommit == 0) {
+		console.log("No files to commit.");	
+	}
+	else if (numberToCommit == 1) {
+		console.log("Committing 1 file...\n");
+	}
+	else {
+		console.log(`Committing ${numberToCommit} files...\n`);	
+	}
 	await commit();
 
 	if (storage.shutdown) {
-		console.log("\nShutting down storage module...");
+		console.log(
+			(numberToCommit == 0? "" : "\n")
+			+ "Shutting down storage module..."
+		);
 		const output = storage.shutdown();
 		if (output instanceof Promise) await output;
 	}

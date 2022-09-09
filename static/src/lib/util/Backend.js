@@ -39,7 +39,7 @@ const standardFetch = async (path, args, ignoreNonOk = false) => {
 		const error = await res.text();
 		if (error == "InvalidSessionID") throw new BackendError("LoginNeeded");
 
-		throw new BackendError(error, true);
+		throw new BackendError(error);
 	}
 	return res;
 };
@@ -61,14 +61,16 @@ const ERRORS = {
 	BoolIsNull: IGNORE_ERROR,
 	LoginNeeded: IGNORE_ERROR,
 	DirectStorageNotSupported: "Direct storage access isn't supported by this server",
-	SomeNotConfigured: "Some of the initial config isn't done. Somehow...?"
+	SomeNotConfigured: "Some of the initial config isn't done. Somehow...?",
+	NotFound: INTERNAL_ERROR
 };
 
-
+console.log("A")
 
 export const tasks = {
 	init: null,
-	check: null
+	check: null,
+	sync: null
 };
 export const progress = {
 	check: -1
@@ -142,7 +144,7 @@ export const changeServerURL = value => {
 	return promise;
 };
 
-let db, cached;
+let db, misc, cached;
 export const init = (sessionNeeded = false, specialPage) => {
 	const promise = (async _ => {
 		const isLoginPage = specialPage == "login";
@@ -152,6 +154,7 @@ export const init = (sessionNeeded = false, specialPage) => {
 			upgrade: async (db, oldVersion, newVersion, transaction) => {
 				db.createObjectStore("files");
 				db.createObjectStore("metadata");
+				db.createObjectStore("oldMetadata"); // The contents of metdata is copied into here on sync, in case things go wrong
 				db.createObjectStore("misc");
 				db.createObjectStore("cache");
 	
@@ -161,8 +164,9 @@ export const init = (sessionNeeded = false, specialPage) => {
 						session: null,
 	
 						metaVersionStored: -1,
+						oldMetaVersionStored: -1,
 						versionStored: -1,
-						wasUpgradingTo: -1, // Set during a sync so if the tab's closed, the right files can be discarded and syncing can continue/restart. Set to -1 when all done
+						wasUpgrading: false, // Set during a sync so if the tab's closed Bopfall knows to delete all the files and resync
 						knownVersion: -1
 					},
 					cache: {
@@ -171,15 +175,20 @@ export const init = (sessionNeeded = false, specialPage) => {
 				}, false, transaction);
 			}
 		});
-		const read = await tools.db.readParrelel(db, {
+		misc = await tools.db.readParrelel(db, {
 			misc: [
 				"serverURL",
 				"session",
-				"metaVersionStored"
+
+				"metaVersionStored",
+				"oldMetaVersionStored",
+				"versionStored",
+				"wasUpgrading",
+				"knownVersion"
 			]
 		});
-		serverURL = read.serverURL;
-		session = read.session;
+		serverURL = misc.serverURL;
+		session = misc.session;
 		cached = await tools.db.readParrelel(db, {
 			cache: [
 				"configDone"
@@ -197,12 +206,12 @@ export const init = (sessionNeeded = false, specialPage) => {
 		};
 
 		const isUsable = sessionNeeded?
-			(read.session != null && await isLoggedIn())
-			: (read.metaVersionStored != -1 || (read.session != null && ((! isLoginPage) || await isLoggedIn()))) // If this is the login page, make sure the session is valid
+			(misc.session != null && await isLoggedIn())
+			: (misc.metaVersionStored != -1 || (misc.session != null && ((! isLoginPage) || await isLoggedIn()))) // If this is the login page, make sure the session is valid
 		;
 		
 		if (! shouldStopNextDefault) {
-			const serverNeeded = read.metaVersionStored == -1;
+			const serverNeeded = misc.metaVersionStored == -1;
 			
 			let changingPage = false;
 			if (isUsable) {
@@ -276,6 +285,62 @@ export const login = async (password, isSetupCode) => {
 
 	commandDone();
 };
+export const isSyncNeeded = async _ => {
+	await initIfNeeded();
+
+	return misc.versionStored == -1;
+};
+export const sync = _ => {
+	const anythingToSync = (async _ => {
+		await initIfNeeded();
+
+		// The latest version is fetched again even if a new version is known about since there might be another new version and it won't take long
+		const latestVersion = parseInt(await request.file.getText("musicIndexVersion.txt"), 36);
+		if (misc.versionStored == latestVersion) return false; // Note that this is comparing to the overall version, not just the meta version
+
+		if (misc.latestVersion != latestVersion) {
+			misc.knownVersion = latestVersion;
+			db.put("misc", latestVersion, "knownVersion");
+		}
+
+		return true;
+	})();
+	const metaSync = (async _ => {
+		if (! (await anythingToSync)) return false;
+		if (misc.metaVersionStored == misc.knownVersion) return false; // No newer version to download
+
+		const metadata = await request.file.getJSON("musicIndex.json");
+
+		const transaction = db.transaction("metadata", "readwrite");
+		const promises = [transaction.store.clear()];
+		promises.push(transaction.done);
+		for (const [key, value] of Object.entries(metadata)) {
+			promises.push(transaction.store.add(value, key));
+		}
+
+		await Promise.all(promises);
+
+		db.put("misc", misc.knownVersion, "metaVersionStored");
+		misc.metaVersionStored = misc.knownVersion;
+
+		return true;
+	})();
+	const syncFiles = (async _ => {
+		if (! (await anythingToSync)) return false;
+		await metaSync;
+
+		// TODO: download the files depending on the mode
+	})();
+
+	return [
+		syncFiles, // The last task, so it's equivalent to awaiting all of them
+
+		anythingToSync,
+		metaSync,
+		syncFiles
+	];
+};
+
 
 const updateCache = (id, value) => { // Not async since this can happen in the background
 	cached[id] = value;
@@ -344,6 +409,24 @@ const sendRequest = {
 	}
 };
 export const request = {
+	login: {
+		status: {
+			check: async _ => {
+				await initIfNeeded(false); // It's fine if we're not logged in
+
+				// The server will send a non ok if we're not logged in, so the true prevents the usual handling so it doesn't trigger an error the user sees
+				const res = await sendRequest.getText("/login/status/check", true);
+
+				let loggedIn;
+				if (res == "LoggedIn") loggedIn = true;
+				else if (res == "InvalidSessionID" || res == "NoSessionID") loggedIn = false;
+				else throw new BackendError(res);
+
+				commandDone();
+				return loggedIn;
+			}
+		}
+	},
 	password: {
 		status: {
 			set: async _ => {
@@ -437,22 +520,21 @@ export const request = {
 			commandDone();
 		}
 	},
-	login: {
-		status: {
-			check: async _ => {
-				await initIfNeeded(false); // It's fine if we're not logged in
 
-				// The server will send a non ok if we're not logged in, so the true prevents the usual handling so it doesn't trigger an error the user sees
-				const res = await sendRequest.getText("/login/status/check", true);
-
-				let loggedIn;
-				if (res == "LoggedIn") loggedIn = true;
-				else if (res == "InvalidSessionID" || res == "NoSessionID") loggedIn = false;
-				else throw new BackendError(res);
-
-				commandDone();
-				return loggedIn;
-			}
+	file: {
+		getText: async path => {
+			await initIfNeeded();
+	
+			const result = await sendRequest.getText("/file/get/" + path);
+			commandDone();
+			return result;
+		},
+		getJSON: async path => {
+			await initIfNeeded();
+	
+			const result = await sendRequest.getJSON("/file/get/" + path);
+			commandDone();
+			return result;
 		}
 	}
 };

@@ -1,9 +1,7 @@
-<script>
-	import * as backend from "$util/Backend.js";
-	
+<script>	
+	import BackendInit from "$util/BackendInit.svelte";
 	import Toast from "$util/Toast.svelte";
 	import InitialSetup from "$lib/InitialSetup.svelte";
-	import BackendInit from "$util/BackendInit.svelte";
 
 	let toast;
 </script>

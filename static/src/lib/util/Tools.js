@@ -126,6 +126,7 @@ export const db = {
 			}
 		}
 	
+		if (transaction) promises.push(transaction.done);
 		await Promise.all(promises);
 	}
 };

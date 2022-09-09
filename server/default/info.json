@@ -5,8 +5,7 @@
 		"db": 1,
 		"config": 1,
 		"state": 1,
-		"musicIndex": false,
-		"login": false
+		"musicIndex": 1
 	},
 	"initialFilesMade": false
 }

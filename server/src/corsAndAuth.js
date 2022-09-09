@@ -42,7 +42,7 @@ const sendFullCors = (origin, res) => {
 };
 const authenticate = (req, res) => {
 	let session = req.headers.authorization;
-	if (session == null || session == "") {
+	if (session == null || session == "") { // No idea if this is possible to happen or not but just in case there's a weird edge case, reject these session ids
 		res.status(401).send("NoSessionID");
 		return false;
 	}
