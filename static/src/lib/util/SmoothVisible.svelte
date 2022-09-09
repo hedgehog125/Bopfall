@@ -1,19 +1,20 @@
 <script>
 	import { timing } from "$util/Tools.js";
+	import { onMount } from "svelte";
 
 	export let input;
-	export let output;
+	export let output = null;
 
 	export let showAfter = 150;
 	export let minShowTime = 500;
 
 	let showTask, lastShownTime, hideTask, lastInput;
 
+	onMount(_ => {
+		lastInput = input;
+	});
+
 	const inputChanged = _ => {
-		if (output == null) {
-			output = input;
-			lastInput = input;
-		}
 		if (input == lastInput) return;
 		lastInput = input;
 
@@ -38,3 +39,11 @@
 
 	$: inputChanged(input);
 </script>
+
+{#if output != null}
+	{#if output}
+		<slot name="main"></slot>
+	{:else}
+		<slot name="else"></slot>
+	{/if}
+{/if}

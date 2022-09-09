@@ -1,5 +1,12 @@
-<script></script>
+<script>
+	import SmoothVisible from "$util/SmoothVisible.svelte";
 
-<main>
-	TODO: loading animation
-</main>
+	export let loading;
+</script>
+
+<SmoothVisible input={loading}>
+	<p slot="main">
+		TODO: loading animation
+	</p>
+	<slot slot="else"></slot>
+</SmoothVisible>

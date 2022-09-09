@@ -1,16 +1,16 @@
 <script>
 	import LoadingScreen from "$util/LoadingScreen.svelte";
-	import MusicOverview from "$lib/MusicOverview.svelte";
 
+	import { url } from "$util/Tools.js";
 	import { syncIfNeeded } from "$util/Backend.js";
-	import { getRecents } from "$util/Player.js";
+	import { getTracks, play } from "$util/Player.js";
 	import { onMount } from "svelte";
 	
-	let recent;
+	let tracks;
 	let loading = true;
 	const load = async _ => {
 		await syncIfNeeded();
-		recent = await getRecents();
+		tracks = await getTracks.inAlbum(url.requireParam("id", "number"));
 
 		loading = false;
 	};
@@ -19,6 +19,10 @@
 
 <main>
 	<LoadingScreen {loading}>
-		<MusicOverview {recent}></MusicOverview>
+		{#each tracks as track}
+			<button on:click={_ => {play(track.id)}}>
+				{track.name}
+			</button>
+		{/each}
 	</LoadingScreen>
 </main>

@@ -37,10 +37,10 @@ Await any start result then stop handling request if invalid
 writeParrelel should create a transaction for all the writes. Maybe for readParrelel as well?
 
 Rename to SoundDrop. The logo/loading animation is a stream that fills up because of the drops, until it's full which is 100%. The stream is continuous throughout
+Move linkPage to Tools.js
 
 = Optimisations =
 Preload images
-Cache backend values between pages
 
 Load some node.js modules after load - Not really worth it
 
@@ -396,7 +396,20 @@ const startServer = {
 					return;
 				}
 
-				res.setHeader("Content-Type", mime.contentType(path) || "text/plain; charset=utf-8");
+				let mimeType;
+				if (path.startsWith("track/")) {
+					const trackID = path.slice(6); // 6 is the length of the prefix
+					const info = musicIndex.tracks[trackID];
+					if (info) {
+						mimeType = info.mime;
+					}
+				}
+
+				if (mimeType == null) {
+					mimeType = mime.contentType(path) || "text/plain; charset=utf-8"
+				}
+
+				res.setHeader("Content-Type", mimeType);
 				res.send(data);
 			});
 		}

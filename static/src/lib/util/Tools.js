@@ -85,6 +85,28 @@ export const navigateTo = {
 		goto(url);
 	}
 };
+export const url = {
+	requireParam: (name, type = "string") => {
+		const url = new URL(location.href);
+
+		let valid = true;
+		let param;
+		if (url.searchParams.has(name)) {
+			param = url.searchParams.get(name);
+			if (type == "number") {
+				param = parseFloat(param);
+				if (isNaN(param)) valid = false;
+			}
+		}
+		else valid = false;
+
+		if (! valid) {
+			goto(linkPage(""));
+			throw new Error("Missing or invalid search parameter, going to homepage...");
+		}
+		return param;
+	}
+};
 export const db = {
 	readParrelel: async (db, allProperties) => {
 		let read = {};
@@ -130,3 +152,4 @@ export const db = {
 		await Promise.all(promises);
 	}
 };
+export const removeNulls = arr => arr.filter(value => value != null);

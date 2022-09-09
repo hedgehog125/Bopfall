@@ -1,7 +1,14 @@
 <script>
-	import HomePage from "$lib/HomePage.svelte";
+	import MusicRow from "$sub/MusicRow.svelte";
+
+	export let recent;
 </script>
 
 <main>
-	<HomePage></HomePage>
+	{#each recent as [title, items, rowType]}
+		<h2>
+			{title}
+		</h2>
+		<MusicRow {items} {rowType}></MusicRow>
+	{/each}
 </main>

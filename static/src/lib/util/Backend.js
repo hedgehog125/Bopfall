@@ -65,7 +65,7 @@ const ERRORS = {
 	NotFound: INTERNAL_ERROR
 };
 
-console.log("A")
+
 
 export const tasks = {
 	init: null,
@@ -144,7 +144,7 @@ export const changeServerURL = value => {
 	return promise;
 };
 
-let db, misc, cached;
+let db, misc, cached, musicIndex;
 export const init = (sessionNeeded = false, specialPage) => {
 	const promise = (async _ => {
 		const isLoginPage = specialPage == "login";
@@ -154,7 +154,6 @@ export const init = (sessionNeeded = false, specialPage) => {
 			upgrade: async (db, oldVersion, newVersion, transaction) => {
 				db.createObjectStore("files");
 				db.createObjectStore("metadata");
-				db.createObjectStore("oldMetadata"); // The contents of metdata is copied into here on sync, in case things go wrong
 				db.createObjectStore("misc");
 				db.createObjectStore("cache");
 	
@@ -171,6 +170,10 @@ export const init = (sessionNeeded = false, specialPage) => {
 					},
 					cache: {
 						configDone: null
+					},
+					metadata: {
+						current: null,
+						old: null
 					}
 				}, false, transaction);
 			}
@@ -194,6 +197,8 @@ export const init = (sessionNeeded = false, specialPage) => {
 				"configDone"
 			]
 		});
+		musicIndex = await db.get("metadata", "current");
+
 	
 		// Because it hasn't initialised yet, the proper functions can't be used
 		const isConfigDone = isConfigDoneInternal;
@@ -290,6 +295,11 @@ export const isSyncNeeded = async _ => {
 
 	return misc.versionStored == -1;
 };
+export const syncIfNeeded = async _ => {
+	await initIfNeeded();
+
+	if (await isSyncNeeded()) await sync()[0];
+};
 export const sync = _ => {
 	const anythingToSync = (async _ => {
 		await initIfNeeded();
@@ -310,15 +320,8 @@ export const sync = _ => {
 		if (misc.metaVersionStored == misc.knownVersion) return false; // No newer version to download
 
 		const metadata = await request.file.getJSON("musicIndex.json");
-
-		const transaction = db.transaction("metadata", "readwrite");
-		const promises = [transaction.store.clear()];
-		promises.push(transaction.done);
-		for (const [key, value] of Object.entries(metadata)) {
-			promises.push(transaction.store.add(value, key));
-		}
-
-		await Promise.all(promises);
+		musicIndex = metadata;
+		await db.put("metadata", musicIndex, "current");
 
 		db.put("misc", misc.knownVersion, "metaVersionStored");
 		misc.metaVersionStored = misc.knownVersion;
@@ -381,6 +384,13 @@ const sendRequest = {
 			return null;
 		}
 		return res === "true";
+	},
+	getBlob: async (path, ignoreNonOk) => {
+		return await (await standardFetch(path, {
+			headers: {
+				"Authorization": "sessionid " + session
+			}
+		}, ignoreNonOk)).blob();
 	},
 
 	postJSON: async (path, value, responseIsText = false, ignoreNonOk) => {
@@ -522,19 +532,33 @@ export const request = {
 	},
 
 	file: {
+		getURLPath: path => "/file/get/" + path,
 		getText: async path => {
 			await initIfNeeded();
 	
-			const result = await sendRequest.getText("/file/get/" + path);
+			const result = await sendRequest.getText(request.file.getURLPath(path));
 			commandDone();
 			return result;
 		},
 		getJSON: async path => {
 			await initIfNeeded();
 	
-			const result = await sendRequest.getJSON("/file/get/" + path);
+			const result = await sendRequest.getJSON(request.file.getURLPath(path));
+			commandDone();
+			return result;
+		},
+		getBlob: async path => {
+			await initIfNeeded();
+
+			const result = await sendRequest.getBlob(request.file.getURLPath(path));
 			commandDone();
 			return result;
 		}
+	},
+
+	musicIndex: async _ => {
+		await syncIfNeeded();
+
+		return musicIndex;
 	}
 };
