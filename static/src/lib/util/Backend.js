@@ -62,8 +62,12 @@ const ERRORS = {
 	LoginNeeded: IGNORE_ERROR,
 	DirectStorageNotSupported: "Direct storage access isn't supported by this server",
 	SomeNotConfigured: "Some of the initial config isn't done. Somehow...?",
-	NotFound: INTERNAL_ERROR
+	NotFound: INTERNAL_ERROR,
+
+	UploadTooBig: "Files must be 50MB or less"
 };
+
+const MB_TO_BYTES = 1024 * 1024;
 
 
 
@@ -553,6 +557,42 @@ export const request = {
 			const result = await sendRequest.getBlob(request.file.getURLPath(path));
 			commandDone();
 			return result;
+		},
+
+		upload: {
+			batch: files => {
+				let progresses = new Array(files.length).fill(0);
+
+				let promise = (async _ => {
+					await initIfNeeded();
+
+					for (let file of files) {
+						if (file.size > 50 * MB_TO_BYTES) {
+							throw new BackendError("UploadTooBig");
+						}
+					}
+
+					const uploadSession = await sendRequest.postJSON("/file/upload/request", {
+						count: files.length
+					}).uploadSession;
+					
+					for (let [fileID, file] of Object.entries(files)) {
+						let upload = new FormData();
+            			upload.set("upload", file);
+
+						await standardFetch("/file/upload/id/" + fileID, {
+							method: "POST",
+							headers: {
+								"Content-Type": "multipart/form-data",
+								"Authorization": `sessionid ${session}; uploadid ${uploadSession}`
+							},
+							body: upload
+						});
+					}
+				})();
+				commandDone();
+				return [promise, progresses];
+			}
 		}
 	},
 

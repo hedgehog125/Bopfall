@@ -1,4 +1,4 @@
-import { indexArray } from "./tools.js";
+import { indexArray, checkAuthHeaderPair } from "./tools.js";
 
 let wildcardCorsRoutes, initialConfigRoutes,
 allowedBeforeInitialConfig, noAuthRoutes, mainConfig,
@@ -46,15 +46,8 @@ const authenticate = (req, res) => {
 		res.status(401).send("NoSessionID");
 		return false;
 	}
-	session = session.split(" ");
-	if (session.length != 2) {
-		res.status(400).send("InvalidAuthorizationHeaderFormat");
-		return false;
-	}
-	if (session[0].toLowerCase() != "sessionid") {
-		res.send(400).send("InvalidAuthorizationScheme");
-		return false;
-	}
+	session = session.split(";")[0].split(" ");
+	if (! checkAuthHeaderPair(session, "sessionid", res)) return false;
 	session = session[1];
 
 	const sessions = state.persistent.auth.sessions;

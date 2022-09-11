@@ -1,11 +1,13 @@
-import { indexArray } from "./tools.js";
-import express from "express";
+import { accept as checkMiddleware } from "paperwork";
 
-const middleware = (routes = []) => {
-	const indexedRoutes = indexArray(routes);
-
+const middleware = (routeFormats = {}) => {
+	let validators = Object.create(null, {});
+	for (let route in routeFormats) {
+		validators[route] = checkMiddleware(routeFormats[route]);
+	}
+	
 	return (req, res, next) => {
-		if ((! indexedRoutes[req.url]) || req.method == "OPTIONS") {
+		if ((! validators[req.url]) || req.method == "OPTIONS") {
 			next();
 			return;
 		}
@@ -14,7 +16,7 @@ const middleware = (routes = []) => {
 			res.status(400).send("InvalidContentType");
 			return;
 		}
-		next();
+		validators[req.url](req, res, next);
 	};
 };
 export default middleware;

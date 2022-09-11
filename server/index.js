@@ -22,9 +22,12 @@ Delete idb on server change, and prompt if there's more than a few files cached
 Catch file errors and handle them where possible
 Send server version in /info and have client check it in the background on connect, then error if incompatible. Maybe have syntax version?
 Handle wasUpgradingTo not being -1
+Handle active upload during shutdown. Set some state so it can be continued or restarted once the server is running again
 
 Fallback to accessing via server on 404. A music file might have been deleted but the new metadata hasn't been saved yet
 Checks and recovery logic on sync
+Handle upload errors, cancel sometimes and retry otherwise
+Only allow an upload at once
 
 = Tweaks =
 Display toast on network change
@@ -77,21 +80,23 @@ import ipPackage from "ip";
 const IP = ipPackage.address();
 
 import * as tools from "./src/tools.js";
-
-import express from "express";
-import jsonPlus from "./src/jsonPlus.js";
-import corsAndAuth from "./src/corsAndAuth.js";
 const {
 	makeExposedPromise, loadJSONOrDefault, loadJSON,
 	setJSONToDefault
 } = tools;
+
+import express from "express";
+import jsonPlus from "./src/jsonPlus.js";
+import corsAndAuth from "./src/corsAndAuth.js";
+import fileUpload from "express-fileupload";
 const app = express();
 let server;
 
 import * as bcrypt from "bcrypt";
-import * as musicMetadata from "music-metadata";
+import { parseBuffer } from "music-metadata";
 import * as mime from "mime-types";
 import { createTerminus } from "@godaddy/terminus";
+import { randomUUID } from "crypto";
 
 const state = {
 	started: false,
@@ -134,17 +139,33 @@ const MAIN_FILES = [
 	["musicIndexVersion", "txt", _ => musicIndexVersion, value => {musicIndexVersion = value}]
 ];
 const SECONDS_TO_MS = 1000;
+const MB_TO_BYTES = 1024 * 1024;
 
 const startServer = {
 	basic: _ => {
 		app.use(express.json());
-		app.use(jsonPlus([
-			"/login",
-			"/password/change",
-			"/password/change/initial",
-			"/cors/change",
-			"/directStorage/change"
-		]));
+		app.use(jsonPlus({
+			"/login": {
+				password: String
+			},
+			"/password/change": {
+				password: String,
+				newPassword: String
+			},
+			"/password/change/initial": {
+				newPassword: String
+			},
+			"/cors/change": {
+				domains: [String]
+			},
+			"/directStorage/change": {
+				enable: Boolean
+			},
+			"/file/upload/request": {
+				count: [Number]
+			}
+		}));
+
 		app.use(corsAndAuth({
 			wildcardCorsRoutes: [ // These are here so they can be accessed while the storage is loading
 				"/info",
@@ -289,11 +310,6 @@ const startServer = {
 		});
 
 		app.post("/cors/change", (req, res) => {
-			if (! Array.isArray(req.body.domains)) {
-				res.status(400).send("DomainsNotArray");
-				return;
-			}
-
 			config.main.clientDomains = req.body.domains;
 			filesUpdated.config = true;
 			corsAndAuth.update.clientDomains();
@@ -304,7 +320,7 @@ const startServer = {
 			res.send((config.main.clientDomains.length != 0).toString());
 		});
 		app.post("/directStorage/change", (req, res) => {
-			const enable = !!req.body.enable;
+			const enable = req.body.enable;
 			if (enable && (! storageInfo.directStorage.supported)) {
 				res.send(409).send("DirectStorageNotSupported");
 				return;
@@ -413,6 +429,114 @@ const startServer = {
 				res.send(data);
 			});
 		}
+		app.post("/file/upload/request", (req, res) => {
+			if (state.persistent.upload != null) {
+				res.status(503).send("AlreadyUploading");
+				return;
+			}
+
+			const session = randomUUID();
+			state.persistent.upload = {
+				token: session,
+				expected: req.body.count,
+				uploaded: 0,
+				lastRequest: Date.now(),
+				fileStatuses: new Array(req.body.count).fill("pending")
+			};
+			filesUpdated.state = true;
+
+			res.json({
+				uploadSession: session
+			});
+		});
+		{
+			const handleFail = (req, resetStatus) => { // Only handles errors that happen after the form is passed, so there's some state to reset
+				if (resetStatus) {
+					const fileID = parseInt(req.params.fileID);
+					state.persistent.upload.finishedFiles[fileID] = "pending";
+				}
+			};
+			app.post("/file/upload/id/:fileID", (req, res, next) => {
+				// Before decoding the form data and filling up the RAM, first we'll check that the upload session is valid
+				let authorized = false;
+				if (state.persistent.upload != null) {
+					let session = req.headers.authorization.split(";");
+					if (session.length < 2) { // Needs a different error to the unauthorised one
+						res.status(400).send("MissingUploadSession").end();
+						return;
+					}
+					if (session[0] == " ") session = session.slice(1);
+					session = session[1].split(" ");
+	
+					if (! tools.checkAuthHeaderPair(session, "uploadid", res)) { // This handles sending the error to the client
+						res.end();
+						return;
+					}
+					session = session[1];
+	
+					if (state.persistent.upload.token == session) {
+						authorized = true;
+					}
+				}
+	
+				if (! authorized) {
+					res.status(403).send("InvalidUploadSession");
+					res.end();
+					return;
+				}
+	
+				state.persistent.upload.lastRequest = Date.now();
+				filesUpdated.state = true;
+				next();
+			}, fileUpload({
+				limits: {
+					fileSize: 50 * MB_TO_BYTES,
+					files: 1,
+					parts: 1,
+					fields: 0
+				},
+				abortOnLimit: true,
+				responseOnLimit: "UploadTooBig",
+				limitHandler: (req, res, next) => {
+					handleFail(req, false);
+					next();
+				},
+				uploadTimeout: 5000
+			}), async (req, res) => {
+				state.persistent.upload.lastRequest = Date.now();
+				filesUpdated.state = true;
+
+				if (req.files.upload == null) {
+					res.status(400).send("MissingUpload");
+					handleFail(req, false);
+					return;
+				}
+				
+				const fileID = parseInt(req.params.fileID);
+				const status = state.persistent.upload.finishedFiles[fileID];
+				if (status == "pending" || status == "processing") {
+					res.status(409).send("AlreadyUploadedFile");
+					handleFail(req, false);
+					return;
+				}
+				state.persistent.upload.finishedFiles[fileID] = "processing";
+
+				let metadata;
+				try {
+					metadata = await parseBuffer(req.files.upload.data, req.files.upload.mimetype);
+				}
+				catch {
+					res.status(400).send("UnableToParse");
+					handleFail(req, true);
+					return;
+				}
+
+				debugger;
+			});
+		}
+		app.get("/file/status/anyUploading", (req, res) => {
+			res.send((state.persistent.upload != null).toString());
+		});
 	
 		app.use((req, res, next) => { // Sends a 200 code for preflights with no endpoints to reduce confusion as that request should be fine (it passed CORS checks earlier)
 			if (req.method == "OPTIONS") res.send();

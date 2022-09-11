@@ -33,7 +33,7 @@ export const loadJSON = async filePath => {
 		throw new Error(`Invalid JSON in the ${filePath} file (in the dynamic storage).`);
 	}
 };
-export const setJSONToDefault = async (filePath, defaultValuePath=filePath) => {
+export const setJSONToDefault = async (filePath, defaultValuePath = filePath) => {
 	let defaultValue = JSON.parse(
 		await fs.readFile(
 			path.accessLocal(
@@ -44,7 +44,7 @@ export const setJSONToDefault = async (filePath, defaultValuePath=filePath) => {
 	await storage.writeFile(filePath, JSON.stringify(defaultValue));
 	return defaultValue;
 };
-export const loadJSONOrDefault = async (filePath, defaultValuePath=filePath) => {
+export const loadJSONOrDefault = async (filePath, defaultValuePath = filePath) => {
 	if (! (await storage.exists(filePath))) {
 		return await setJSONToDefault(filePath, defaultValuePath);
 	}
@@ -68,4 +68,16 @@ export const uniqueID = existing => {
 export const stringifyNullableBool = value => value == null? "null" : value.toString();
 export const waitDelay = delay => {
 	return new Promise(resolve => {setTimeout(_ => {resolve()}, delay)});
+};
+
+export const checkAuthHeaderPair = (pair, expectedType, res) => {
+	if (pair.length != 2) {
+		res.status(400).send("InvalidAuthorizationHeaderFormat");
+		return false;
+	}
+	if (pair[0].toLowerCase() != expectedType) {
+		res.send(400).send("InvalidAuthorizationScheme");
+		return false;
+	}
+	return true;
 };
