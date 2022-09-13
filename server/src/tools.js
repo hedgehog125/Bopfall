@@ -33,20 +33,26 @@ export const loadJSON = async filePath => {
 		throw new Error(`Invalid JSON in the ${filePath} file (in the dynamic storage).`);
 	}
 };
-export const setJSONToDefault = async (filePath, defaultValuePath = filePath) => {
-	let defaultValue = JSON.parse(
-		await fs.readFile(
-			path.accessLocal(
-				"default/" + defaultValuePath
-			)
+export const setFileToDefault = async (filePath, isJSON, defaultValuePath = filePath) => {
+	let defaultValue = await fs.readFile(
+		path.accessLocal(
+			"default/" + defaultValuePath
 		)
 	);
-	await storage.writeFile(filePath, JSON.stringify(defaultValue));
-	return defaultValue;
+
+	if (isJSON) {
+		defaultValue = JSON.parse(defaultValue);
+		await storage.writeFile(filePath, JSON.stringify(defaultValue));
+		return defaultValue;
+	}
+	else {
+		await storage.writeFile(filePath, defaultValue);
+		return defaultValue;
+	}
 };
 export const loadJSONOrDefault = async (filePath, defaultValuePath = filePath) => {
 	if (! (await storage.exists(filePath))) {
-		return await setJSONToDefault(filePath, defaultValuePath);
+		return await setFileToDefault(filePath, true, defaultValuePath);
 	}
 
 	return loadJSON(filePath);
@@ -70,14 +76,25 @@ export const waitDelay = delay => {
 	return new Promise(resolve => {setTimeout(_ => {resolve()}, delay)});
 };
 
-export const checkAuthHeaderPair = (pair, expectedType, res) => {
-	if (pair.length != 2) {
-		res.status(400).send("InvalidAuthorizationHeaderFormat");
-		return false;
+export const parseHeaderPairs = (header, res, isAuth = true) => {
+	if (isAuth) {
+		if (header == null || header == "") {
+			res.status(401).send("NoSessionID");
+			return null;
+		}
 	}
-	if (pair[0].toLowerCase() != expectedType) {
-		res.send(400).send("InvalidAuthorizationScheme");
-		return false;
+	const headersList = header.split(";");
+
+	const headers = Object.create(null, {});
+	for (let pair of headersList) {
+		pair = (pair[0] == " "? pair.slice(1) : pair).split(" ");
+
+		if (pair.length != 2) {
+			res.status(400).send("InvalidHeaderPair");
+			return null;
+		}
+
+		headers[pair[0].toLowerCase()] = pair[1];
 	}
-	return true;
+	return headers;
 };

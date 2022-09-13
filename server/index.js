@@ -9,10 +9,11 @@ Register error listener to shut down properly. Maybe store files using different
 Prevent slashes on the end of client domains. Also ignore ending slashes on request urls
 
 = Bugs =
-Check content-type is JSON when req.json is read
+Prevent the timeout from counting when there's an active connection
 Initial autofill gets cleared on page load in login form
 Commit the previous state of files using a backup/prefix on error, then set something in persistent state so the server won't start again until it's reset. Also log the error I guess?
 
+Handle some or all of the metadata being missing for an upload, a lot of things will be expecting it which can cause errors. e.g toLowerCase being called on a property
 Add backendErrorCaught function that sets shouldStopNextDefault back to its previous value. Should be called every time a BackendError is caught internally in the Backend module
 
 Files seem to be made in a random order? Check the fileIndex and compare with the order of MAIN_FILES
@@ -23,6 +24,7 @@ Catch file errors and handle them where possible
 Send server version in /info and have client check it in the background on connect, then error if incompatible. Maybe have syntax version?
 Handle wasUpgradingTo not being -1
 Handle active upload during shutdown. Set some state so it can be continued or restarted once the server is running again
+Add "ready" property to music index which is only set to true when the upload has finished
 
 Fallback to accessing via server on 404. A music file might have been deleted but the new metadata hasn't been saved yet
 Checks and recovery logic on sync
@@ -30,6 +32,7 @@ Handle upload errors, cancel sometimes and retry otherwise
 Only allow an upload at once
 
 = Tweaks =
+Only check for updates when the sync button is clicked, or silently fail if network error
 Display toast on network change
 
 Make the buttons in the initial setup a component and remove the inner div somehow?
@@ -49,6 +52,7 @@ Load some node.js modules after load - Not really worth it
 
 = Security =
 Implement the fail counter and fail delays. Measure from when the check started as it can take a second
+Make sure the upload session system is actually preventing uploads
 
 = Small features =
 Add shaking animation on error in forms
@@ -56,6 +60,9 @@ Give proper error when the port is already being used
 Update credits to include new packages
 
 ChangeCors should load existing domains if configured
+
+= Features =
+Album, artist and track art. Artist will have to be set manually, or could be generated from the albums
 
 */
 
@@ -82,7 +89,7 @@ const IP = ipPackage.address();
 import * as tools from "./src/tools.js";
 const {
 	makeExposedPromise, loadJSONOrDefault, loadJSON,
-	setJSONToDefault
+	setFileToDefault
 } = tools;
 
 import express from "express";
@@ -93,7 +100,7 @@ const app = express();
 let server;
 
 import * as bcrypt from "bcrypt";
-import { parseBuffer } from "music-metadata";
+import { parseBuffer, selectCover } from "music-metadata";
 import * as mime from "mime-types";
 import { createTerminus } from "@godaddy/terminus";
 import { randomUUID } from "crypto";
@@ -143,29 +150,6 @@ const MB_TO_BYTES = 1024 * 1024;
 
 const startServer = {
 	basic: _ => {
-		app.use(express.json());
-		app.use(jsonPlus({
-			"/login": {
-				password: String
-			},
-			"/password/change": {
-				password: String,
-				newPassword: String
-			},
-			"/password/change/initial": {
-				newPassword: String
-			},
-			"/cors/change": {
-				domains: [String]
-			},
-			"/directStorage/change": {
-				enable: Boolean
-			},
-			"/file/upload/request": {
-				count: [Number]
-			}
-		}));
-
 		app.use(corsAndAuth({
 			wildcardCorsRoutes: [ // These are here so they can be accessed while the storage is loading
 				"/info",
@@ -203,6 +187,28 @@ const startServer = {
 			],
 			mainConfig: config
 		}, tasks.fullStart, state));
+		app.use(express.json());
+		app.use(jsonPlus({
+			"/login": {
+				password: String
+			},
+			"/password/change": {
+				password: String,
+				newPassword: String
+			},
+			"/password/change/initial": {
+				newPassword: String
+			},
+			"/cors/change": {
+				domains: [String]
+			},
+			"/directStorage/change": {
+				enable: Boolean
+			},
+			"/file/upload/request": {
+				count: Number
+			}
+		}));
 
 		app.get("/info", (req, res) => {
 			res.json({
@@ -456,32 +462,27 @@ const startServer = {
 					state.persistent.upload.finishedFiles[fileID] = "pending";
 				}
 			};
+
 			app.post("/file/upload/id/:fileID", (req, res, next) => {
 				// Before decoding the form data and filling up the RAM, first we'll check that the upload session is valid
-				let authorized = false;
-				if (state.persistent.upload != null) {
-					let session = req.headers.authorization.split(";");
-					if (session.length < 2) { // Needs a different error to the unauthorised one
-						res.status(400).send("MissingUploadSession").end();
-						return;
-					}
-					if (session[0] == " ") session = session.slice(1);
-					session = session[1].split(" ");
-	
-					if (! tools.checkAuthHeaderPair(session, "uploadid", res)) { // This handles sending the error to the client
-						res.end();
-						return;
-					}
-					session = session[1];
-	
-					if (state.persistent.upload.token == session) {
-						authorized = true;
-					}
+				if (state.persistent.upload == null) {
+					res.status(403).send("NoActiveSession").end();
+					return;
 				}
-	
-				if (! authorized) {
-					res.status(403).send("InvalidUploadSession");
+
+				let session = tools.parseHeaderPairs(req.headers.authorization, res);
+				if (session == null) {
 					res.end();
+					return;
+				}
+				session = session.uploadid;
+				if (session == null) {
+					res.status(403).send("NoUploadID").end();
+					return;
+				}
+
+				if (state.persistent.upload.token != session) {
+					res.status(403).send("InvalidUploadSession").end();
 					return;
 				}
 	
@@ -506,24 +507,25 @@ const startServer = {
 				state.persistent.upload.lastRequest = Date.now();
 				filesUpdated.state = true;
 
-				if (req.files.upload == null) {
+				if (req.files == null || req.files.upload == null) {
 					res.status(400).send("MissingUpload");
 					handleFail(req, false);
 					return;
 				}
 				
 				const fileID = parseInt(req.params.fileID);
-				const status = state.persistent.upload.finishedFiles[fileID];
-				if (status == "pending" || status == "processing") {
+				const status = state.persistent.upload.fileStatuses[fileID];
+				if (status == "processing" || status == "done") {
 					res.status(409).send("AlreadyUploadedFile");
 					handleFail(req, false);
 					return;
 				}
-				state.persistent.upload.finishedFiles[fileID] = "processing";
+				state.persistent.upload.fileStatuses[fileID] = "processing";
 
+				const upload = req.files.upload;
 				let metadata;
 				try {
-					metadata = await parseBuffer(req.files.upload.data, req.files.upload.mimetype);
+					metadata = await parseBuffer(upload.data, upload.mimetype);
 				}
 				catch {
 					res.status(400).send("UnableToParse");
@@ -531,7 +533,70 @@ const startServer = {
 					return;
 				}
 
-				debugger;
+				const common = metadata.common;
+				let imageID = -1;
+				{
+					const image = selectCover(common.picture);
+					if (image != null) {
+						console.log("TODO: check hash and create file and update index if different. Then set imageID");
+					}
+				}
+
+				let artistID;
+				{
+					const artistName = common.artist;
+					let lower = artistName.toLowerCase();
+					artistID = musicIndex.artists.findIndex(info => info && info.name.toLowerCase() == lower);
+
+					if (artistID == -1) {
+						artistID = musicIndex.artists.length;
+						musicIndex.artists.push({
+							name: artistName,
+							image: -1 // TODO
+						});
+					}
+				}
+				let albumID;
+				{
+					const albumName = common.album;
+					let lower = albumName.toLowerCase();
+					albumID = musicIndex.albums.findIndex(info => info && info.artist == artistID && info.name.toLowerCase() == lower);
+
+					if (albumID == -1) {
+						albumID = musicIndex.albums.length;
+						musicIndex.albums.push({
+							name: albumName,
+							image: -1, // TODO
+							artist: artistID
+						});
+					}
+				}
+
+				const trackID = musicIndex.tracks.length;
+				musicIndex.tracks.push({
+					name: common.title,
+					fileName: upload.name,
+					artist: artistID,
+					album: albumID,
+					duration: metadata.format.duration,
+					lossless: metadata.format.lossless,
+					image: imageID,
+					genres: common.genre,
+					year: common.year,
+					track: common.track, // { no: _, of: _ }
+
+					metaManuallyChanged: false,
+					hash: upload.md5,
+					mime: upload.mimetype
+				});
+
+				filesUpdated.musicIndex = true;
+				state.persistent.upload.lastRequest = Date.now();
+
+				await storage.writeFile("track/" + trackID.toString(36), upload.data);
+
+				state.persistent.upload.fileStatuses[fileID] = "done";
+				res.send();
 			});
 		}
 		app.get("/file/status/anyUploading", (req, res) => {
@@ -589,6 +654,7 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 			]);
 		}
 
+		tick();
 		setInterval(tick, 1000);
 		setInterval(periodicCommit, config.main.timings.commitInterval);
 	},
@@ -634,7 +700,7 @@ And for other devices on your LAN: http://${IP}:${PORT}/
 			for (let [name, extension, _, setValue] of MAIN_FILES) {
 				const fileName = name + "." + extension;
 				tasks.push((async _ => {
-					setValue(await setJSONToDefault(fileName));
+					setValue(await setFileToDefault(fileName, extension == "json"));
 				})());
 			}
 			await Promise.all(tasks);
@@ -731,15 +797,23 @@ const shutdown = async _ => {
 };
 
 const tick = _ => {
+	const now = Date.now();
 	{
 		const authState = state.persistent.auth;
 		const authTimings = config.main.timings.auth;
-		const now = Date.now();
 		for (let [id, session] of authState.sessions) {
 			const validFor = session.isInitial? authTimings.validFor.initial : authTimings.validFor.normal;
 			if (now - session.lastRenewTime > validFor) {
 				authState.sessions.delete(id);
 				filesUpdated.state = true;
+			}
+		}
+	}
+	{
+		const uploadState = state.persistent.upload;
+		if (uploadState != null) {
+			if (now - uploadState.lastRequest > config.main.timings.upload.timeout) {
+				console.log("TODO: handle timed out upload depending on what's uploaded");
 			}
 		}
 	}

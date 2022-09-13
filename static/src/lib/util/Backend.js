@@ -64,7 +64,8 @@ const ERRORS = {
 	SomeNotConfigured: "Some of the initial config isn't done. Somehow...?",
 	NotFound: INTERNAL_ERROR,
 
-	UploadTooBig: "Files must be 50MB or less"
+	UploadTooBig: "Files must be 50MB or less",
+	UnableToParse: "The server couldn't parse an upload"
 };
 
 const MB_TO_BYTES = 1024 * 1024;
@@ -572,9 +573,9 @@ export const request = {
 						}
 					}
 
-					const uploadSession = await sendRequest.postJSON("/file/upload/request", {
+					const uploadSession = (await sendRequest.postJSON("/file/upload/request", {
 						count: files.length
-					}).uploadSession;
+					})).uploadSession;
 					
 					for (let [fileID, file] of Object.entries(files)) {
 						let upload = new FormData();
@@ -583,7 +584,6 @@ export const request = {
 						await standardFetch("/file/upload/id/" + fileID, {
 							method: "POST",
 							headers: {
-								"Content-Type": "multipart/form-data",
 								"Authorization": `sessionid ${session}; uploadid ${uploadSession}`
 							},
 							body: upload

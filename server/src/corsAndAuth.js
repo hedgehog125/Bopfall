@@ -1,4 +1,4 @@
-import { indexArray, checkAuthHeaderPair } from "./tools.js";
+import { indexArray, parseHeaderPairs } from "./tools.js";
 
 let wildcardCorsRoutes, initialConfigRoutes,
 allowedBeforeInitialConfig, noAuthRoutes, mainConfig,
@@ -41,14 +41,13 @@ const sendFullCors = (origin, res) => {
 	}
 };
 const authenticate = (req, res) => {
-	let session = req.headers.authorization;
-	if (session == null || session == "") { // No idea if this is possible to happen or not but just in case there's a weird edge case, reject these session ids
+	let session = parseHeaderPairs(req.headers.authorization, res);
+	if (session == null) return false;
+	session = session.sessionid;
+	if (session == null) {
 		res.status(401).send("NoSessionID");
 		return false;
 	}
-	session = session.split(";")[0].split(" ");
-	if (! checkAuthHeaderPair(session, "sessionid", res)) return false;
-	session = session[1];
 
 	const sessions = state.persistent.auth.sessions;
 	if (sessions.has(session)) {

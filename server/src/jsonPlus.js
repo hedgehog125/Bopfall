@@ -7,7 +7,7 @@ const middleware = (routeFormats = {}) => {
 	}
 	
 	return (req, res, next) => {
-		if ((! validators[req.url]) || req.method == "OPTIONS") {
+		if ((! validators[req.url]) || req.method != "POST") {
 			next();
 			return;
 		}
