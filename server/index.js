@@ -12,11 +12,14 @@ Prevent slashes on the end of client domains. Also ignore ending slashes on requ
 Prevent the timeout from counting when there's an active connection
 Initial autofill gets cleared on page load in login form
 Commit the previous state of files using a backup/prefix on error, then set something in persistent state so the server won't start again until it's reset. Also log the error I guess?
+Does the server reject requests when the origin is the same as its origin?
 
 Handle some or all of the metadata being missing for an upload, a lot of things will be expecting it which can cause errors. e.g toLowerCase being called on a property
 Add backendErrorCaught function that sets shouldStopNextDefault back to its previous value. Should be called every time a BackendError is caught internally in the Backend module
 
 Files seem to be made in a random order? Check the fileIndex and compare with the order of MAIN_FILES
+
+Service worker will prevent ping from working properly
 
 = Stability =
 Delete idb on server change, and prompt if there's more than a few files cached
@@ -25,6 +28,7 @@ Send server version in /info and have client check it in the background on conne
 Handle wasUpgradingTo not being -1
 Handle active upload during shutdown. Set some state so it can be continued or restarted once the server is running again
 Add "ready" property to music index which is only set to true when the upload has finished
+Does uploading files without a valid session or server state still fill up RAM?
 
 Fallback to accessing via server on 404. A music file might have been deleted but the new metadata hasn't been saved yet
 Checks and recovery logic on sync
@@ -43,7 +47,6 @@ Await any start result then stop handling request if invalid
 writeParrelel should create a transaction for all the writes. Maybe for readParrelel as well?
 
 Rename to SoundDrop. The logo/loading animation is a stream that fills up because of the drops, until it's full which is 100%. The stream is continuous throughout
-Move linkPage to Tools.js
 
 = Optimisations =
 Preload images
@@ -545,8 +548,11 @@ const startServer = {
 				let artistID;
 				{
 					const artistName = common.artist;
-					let lower = artistName.toLowerCase();
-					artistID = musicIndex.artists.findIndex(info => info && info.name.toLowerCase() == lower);
+					let lower = artistName == null? null : artistName.toLowerCase();
+					artistID = lower == null?
+						-1
+						: musicIndex.artists.findIndex(info => info && info.name.toLowerCase() == lower)
+					;
 
 					if (artistID == -1) {
 						artistID = musicIndex.artists.length;
@@ -559,8 +565,11 @@ const startServer = {
 				let albumID;
 				{
 					const albumName = common.album;
-					let lower = albumName.toLowerCase();
-					albumID = musicIndex.albums.findIndex(info => info && info.artist == artistID && info.name.toLowerCase() == lower);
+					let lower = albumName == null? null : albumName.toLowerCase();
+					albumID =  lower == null?
+						-1
+						: musicIndex.albums.findIndex(info => info && info.artist == artistID && info.name.toLowerCase() == lower)
+					;
 
 					if (albumID == -1) {
 						albumID = musicIndex.albums.length;

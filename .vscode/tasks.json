@@ -3,58 +3,68 @@
 	"tasks": [
 		{
 			"label": "Build static",
+			"type": "npm",
+			"script": "build",
 			"options": {
 				"cwd": "${workspaceFolder}/static/"
 			},
-			"command": "npm",
-			"args": [
-				"run",
-				"build"
-			],
+			"group": "build",
 			"problemMatcher": []
 		},
 		{
-			"label": "Deploy static",
+			"label": "Test build static (no base URL)",
+			"type": "npm",
+			"script": "testBuild",
 			"options": {
-				"cwd": "${workspaceFolder}/"
+				"cwd": "${workspaceFolder}/static/"
 			},
-			"command": "./deployBuild.sh",
-			"args": [],
+			"problemMatcher": []
+		},
+		{
+			"label": "Preview last build",
+			"type": "npm",
+			"script": "preview",
+			"options": {
+				"cwd": "${workspaceFolder}/static/"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Deploy last build",
+			"type": "npm",
+			"script": "deployBuild",
+			"options": {
+				"cwd": "${workspaceFolder}/tools/"
+			},
+			"group": "build",
 			"problemMatcher": []
 		},
 		{
 			"label": "Dev static",
+			"type": "npm",
+			"script": "dev",
 			"options": {
 				"cwd": "${workspaceFolder}/static/"
 			},
-			"command": "npm",
-			"args": [
-				"run",
-				"dev"
-			],
 			"problemMatcher": []
 		},
 		{
 			"label": "Start backend",
+			"type": "npm",
+			"script": "start",
 			"options": {
 				"cwd": "${workspaceFolder}/server/"
 			},
-			"command": "node",
-			"args": [
-				"--inspect",
-				"index.js"
-			],
 			"problemMatcher": []
 		},
 		{
 			"label": "Gzip last build",
+			"type": "npm",
+			"script": "gzip",
 			"options": {
-				"cwd": "${workspaceFolder}/gzipTool/"
+				"cwd": "${workspaceFolder}/tools/"
 			},
-			"command": "node",
-			"args": [
-				"gzip.js"
-			],
+			"group": "build",
 			"problemMatcher": []
 		},
 		{
@@ -63,7 +73,28 @@
 				"cwd": "${workspaceFolder}"
 			},
 			"command": "./devInstall.sh",
+			"windows": {
+				"command": ".\\devInstall.cmd"
+			},
 			"args": [],
+			"problemMatcher": []
+		},
+		{
+			"label": "Delete build",
+			"type": "npm",
+			"script": "deleteBuild",
+			"options": {
+				"cwd": "${workspaceFolder}/tools/"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Delete gzipped build",
+			"type": "npm",
+			"script": "deleteGzippedBuild",
+			"options": {
+				"cwd": "${workspaceFolder}/tools/"
+			},
 			"problemMatcher": []
 		}
 	]

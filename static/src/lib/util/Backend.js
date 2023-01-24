@@ -111,7 +111,7 @@ export const changeServerURL = value => {
 			throw new BackendError("CantConnect");
 		}
 
-		if (tools.response.mime(res) != "application/json") {
+		if (tools.getResponseMime(res) != "application/json") {
 			throw new BackendError("NotBopfall");
 		}
 		try {

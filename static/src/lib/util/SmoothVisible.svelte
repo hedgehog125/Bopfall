@@ -1,5 +1,5 @@
 <script>
-	import { timing } from "$util/Tools.js";
+	import { setTimeoutOrImmediate } from "$util/Tools.js";
 	import { onMount } from "svelte";
 
 	export let input;
@@ -30,7 +30,7 @@
 		else {
 			if (hideTask == null) {
 				if (showTask != null) clearTimeout(showTask);
-				hideTask = timing.setTimeoutOrImmediate(_ => {
+				hideTask = setTimeoutOrImmediate(_ => {
 					output = false;
 				}, minShowTime - (new Date() - lastShownTime));
 			}

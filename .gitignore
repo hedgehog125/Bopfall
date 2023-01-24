@@ -1,8 +1,7 @@
 # Specific to this program
-server/keys.json
-server/storage
+static/build
 
-# From sveltekit gitignore
+# From SvelteKit gitignore
 .DS_Store
 .svelte-kit
 .vercel_build_output

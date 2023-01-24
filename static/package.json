@@ -1,22 +1,24 @@
 {
-	"name": "sveltekit-test",
-	"version": "0.0.1",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
-		"package": "svelte-kit package",
-		"preview": "vite preview",
-		"prepare": "svelte-kit sync"
+		"testBuild": "cross-env DISABLE_BASE_URL=true vite build",
+		"debugDuringBuild": "cross-env DISABLE_BASE_URL=true npm --node-options=--inspect-brk run build",
+		"debugDuringBuildWithBase": "npm --node-options=--inspect-brk run build",
+		"preview": "http-server build"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-static": "1.0.0-next.38",
-		"@sveltejs/kit": "1.0.0-next.391",
+		"@sveltejs/adapter-static": "^1.0.0",
+		"@sveltejs/kit": "^1.0.1",
+		"cross-env": "^7.0.3",
 		"html-minifier": "^4.0.0",
-		"svelte": "^3.46.0",
-		"vite": "^3.0.0"
+		"http-server": "^14.1.1",
+		"svelte": "^3.54.0",
+		"vite": "^4.0.0",
+		"sveltekit-plugin-versioned-worker": "^0.2.0"
 	},
-	"type": "module",
 	"dependencies": {
 		"idb": "^7.0.2"
-	}
+	},
+	"type": "module"
 }

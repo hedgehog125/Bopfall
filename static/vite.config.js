@@ -1,8 +1,15 @@
 import { sveltekit } from "@sveltejs/kit/vite";
+import { versionedWorker, fetchLast, readLast } from "sveltekit-plugin-versioned-worker";
 
-/** @type {import("vite").UserConfig} */
 const config = {
-	plugins: [sveltekit()]
+	plugins: [
+		sveltekit(),
+		versionedWorker({
+			lastInfo: process.env.DISABLE_BASE_URL === "true"?
+				readLast("build/versionedWorker.json")
+				: fetchLast("https://hedgehog125.github.io/Bopfall/versionedWorker.json")
+		})
+	]
 };
 
 export default config;

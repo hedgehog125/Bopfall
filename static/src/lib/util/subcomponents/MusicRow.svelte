@@ -1,5 +1,5 @@
 <script>
-	import linkPage from "$util/LinkPage.js";
+	import { linkPage } from "$util/Tools.js";
 
 	export let items;
 	export let rowType;

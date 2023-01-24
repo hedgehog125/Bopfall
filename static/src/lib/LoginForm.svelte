@@ -1,7 +1,7 @@
 <script>
 	import * as backend from "$util/Backend.js";
 	const { request } = backend;
-	import { format } from "$util/Tools.js";
+	import { formatURL } from "$util/Tools.js";
 
 	let domain;
 	$: domainChanged = domain == domain;
@@ -46,7 +46,7 @@
 		if (domain == "" || domain == null) return;
 
 		domainChanged = false;
-		checkServerTask = backend.changeServerURL(format.url(domain));
+		checkServerTask = backend.changeServerURL(formatURL(domain));
 		if (shouldCheckDisplayMode) checkPasswordDisplayMode();
 		return checkServerTask;
 	};

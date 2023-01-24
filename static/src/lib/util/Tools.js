@@ -1,63 +1,41 @@
-import linkPage from "$util/LinkPage.js";
-import { dev } from "$app/env";
+import { base } from "$app/paths";
 import { goto } from "$app/navigation";
+import { dev } from "$app/environment";
 
-export const format = {
-	time: (total, count = 3) => {
-		let hours = Math.floor(total / (60 * 60));
-		total -= hours * (60 * 60);
-		let minutes = Math.floor(total / 60);
-		total -= minutes * 60;
-		let seconds = total;
+export function linkPage(href) {
+	if (href.endsWith("/")) href = href.slice(0, -1);
 
-		let counts = [hours, minutes, seconds];
-		counts.splice(0, counts.length - count);
-		return counts.map(
-			value => value.toString().padStart(2, "0")
-		).join(":");
-	},
-	shorten: (text, limit) => {
-		if (text.length < limit) return text;
+    return base + "/" + href;
+};
 
-		return text.slice(0, limit - 3) + "...";
-	},
-	url: url => url.includes("://")? url : "https://" + url
-};
-export const timing = {
-	setTimeoutOrImmediate: (callback, delay, ...params) => {
-		if (delay <= 0) callback(...params);
-		else return setTimeout(callback, delay, ...params);
-	},
-	makeExposedPromise: _ => {
-		let resolve;
-		let promise = new Promise(res => {
-			resolve = res;
-		});
-		promise.resolve = resolve;
-		return promise;
-	}
-};
-export const response = {
-	mime: res => {
-		const typeHeader = res.headers.get("content-type");
-		if (typeHeader == null) return "";
-		else return typeHeader.split(";")[0];
-	}
-};
-export const connection = {
-	check: async _ => {
-		if (! navigator.onLine) return false;
-		if (dev) return true;
+export function formatTime(total, count = 3) {
+	let hours = Math.floor(total / (60 * 60));
+	total -= hours * (60 * 60);
+	let minutes = Math.floor(total / 60);
+	total -= minutes * 60;
+	let seconds = total;
 
-		try {
-			await fetch(linkPage("ping"));
-		}
-		catch {
-			return false;
-		}
-		return true;
-	}
+	let counts = [hours, minutes, seconds];
+	counts.splice(0, counts.length - count);
+	return counts.map(
+		value => value.toString().padStart(2, "0")
+	).join(":");
 };
+export const formatURL = url => url.includes("://")? url : "https://" + url;
+
+export function setTimeoutOrImmediate(callback, delay, ...params) {
+	if (delay <= 0) callback(...params);
+	else return setTimeout(callback, delay, ...params);
+};
+export function makeExposedPromise() {
+	let resolve;
+	let promise = new Promise(res => {
+		resolve = res;
+	});
+	promise.resolve = resolve;
+	return promise;
+};
+
 export const navigateTo = {
 	url: url => {
 		goto(url);
@@ -85,28 +63,45 @@ export const navigateTo = {
 		goto(url);
 	}
 };
-export const url = {
-	requireParam: (name, type = "string") => {
-		const url = new URL(location.href);
 
-		let valid = true;
-		let param;
-		if (url.searchParams.has(name)) {
-			param = url.searchParams.get(name);
-			if (type == "number") {
-				param = parseFloat(param);
-				if (isNaN(param)) valid = false;
-			}
-		}
-		else valid = false;
+export function requireURLParam(name, type = "string") {
+	const url = new URL(location.href);
 
-		if (! valid) {
-			goto(linkPage(""));
-			throw new Error("Missing or invalid search parameter, going to homepage...");
+	let valid = true;
+	let param;
+	if (url.searchParams.has(name)) {
+		param = url.searchParams.get(name);
+		if (type == "number") {
+			param = parseFloat(param);
+			if (isNaN(param)) valid = false;
 		}
-		return param;
 	}
+	else valid = false;
+
+	if (! valid) {
+		goto(linkPage(""));
+		throw new Error("Missing or invalid search parameter, going to homepage...");
+	}
+	return param;
 };
+export function getResponseMime(res) {
+	const typeHeader = res.headers.get("content-type");
+	if (typeHeader == null) return "";
+	else return typeHeader.split(";")[0];
+};
+export async function checkConnection() {
+	if (! navigator.onLine) return false;
+	if (dev) return true;
+
+	try {
+		await fetch(linkPage("ping"));
+	}
+	catch {
+		return false;
+	}
+	return true;
+};
+
 export const db = {
 	readParrelel: async (db, allProperties) => {
 		let read = {};

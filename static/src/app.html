@@ -3,11 +3,12 @@
 	<head>
 		<meta charset="utf-8"/>
 
-		<link rel="alternate icon" href="%sveltekit.assets%/favicon.png" type="image/png" sizes="32x32"/> <!-- The resolutions here make the browser more likely to use the svg if possible -->
+		<!-- The resolutions here make the browser more likely to use the svg if it's supported -->
+		<link rel="alternate icon" href="%sveltekit.assets%/favicon.png" type="image/png" sizes="32x32"/>
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" size="64x64"/>
 
 		<meta name="theme-color" content="#2F2F2F">
-		<link rel="manifest" href="%sveltekit.assets%/manifest.json"/>
+		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest"/>
 		<link rel="apple-touch-icon" sizes="512x512" type="image/png" href="%sveltekit.assets%/appIcon.png">
 
 		<meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -20,15 +21,4 @@
 	<body>
 		<div>%sveltekit.body%</div>
 	</body>
-	<style>
-		* {
-			font-family: sans-serif;
-		}
-		body {
-			background-color: #2F2F2F;
-		}
-		button {
-			cursor: pointer;
-		}
-	</style>
 </html>

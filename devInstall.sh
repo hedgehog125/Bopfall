@@ -16,7 +16,7 @@ npm install
 echo "
 == 3/3: Installing gzip tool dependencies ==
 "
-cd ../gzipTool
+cd ../tools
 npm install
 
 echo "

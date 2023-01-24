@@ -1,6 +1,6 @@
 <script>
 	import { request } from "$util/Backend.js";
-	import { format } from "$util/Tools.js";
+	import { formatURL } from "$util/Tools.js";
 	import { onMount } from "svelte";
 
 	import deleteIcon from "$img/close.svg";
@@ -16,7 +16,7 @@
 	let domain;
 	let domains = [];
 	const addNewDomain = _ => {
-		domains.push(format.url(domain));
+		domains.push(formatURL(domain));
 		domains = domains;
 
 		domain = "";
