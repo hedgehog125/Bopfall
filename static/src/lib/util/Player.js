@@ -1,25 +1,36 @@
 import { request } from "$util/Backend.js";
 import { removeNulls } from "$util/Tools.js";
+import { browser } from "$app/environent";
 
-let audio, audioURL;
-export const play = async id => {
+let swProxyActive;
+function init() {
+	swProxyActive = navigator.serviceWorker.controller != null;
+};
+
+let audio, audioBlobURL;
+export async function play(id) {
 	if (audio != null) {
 		audio.pause();
-		URL.revokeObjectURL(audioURL);
+		if (audioBlobURL) URL.revokeObjectURL(audioBlobURL);
 
-		audio = null;
-		audioURL = null;
+		audioBlobURL = null;
 	}
 
-	const blob = await request.file.getBlob("track/" + id.toString(36));
-	audio = new Audio(
-		URL.createObjectURL(blob)
-	);
+	audio = new Audio(audioBlobURL);
+	if (swProxyActive) {
+		audio.src = `bopfall-sw-proxy/track/${id.toString()}`;
+	}
+	else {
+		const blob = await request.file.getBlob("track/" + id.toString(36));
+		audioBlobURL = URL.createObjectURL(blob);
+		audio.src = audioBlobURL;
+	}
+
 	audio.play();
 };
 export let playing = false;
 
-export const getRecents = async _ => {
+export async function getRecents() {
 	console.log("TODO: sort by most recent");
 
 	const musicIndex = await request.musicIndex();
@@ -51,3 +62,7 @@ export const getTracks = {
 		})).filter(track => track && track.album == id);
 	}
 };
+
+if (browser) {
+	init();
+}

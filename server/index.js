@@ -149,7 +149,7 @@ const MAIN_FILES = [
 	["musicIndexVersion", "txt", _ => musicIndexVersion, value => {musicIndexVersion = value}]
 ];
 const SECONDS_TO_MS = 1000;
-const MB_TO_BYTES = 1024 * 1024;
+const MB_TO_BYTES = 1000 * 1000;
 
 const startServer = {
 	basic: _ => {

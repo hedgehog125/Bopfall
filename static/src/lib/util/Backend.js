@@ -68,7 +68,7 @@ const ERRORS = {
 	UnableToParse: "The server couldn't parse an upload"
 };
 
-const MB_TO_BYTES = 1024 * 1024;
+const MB_TO_BYTES = 1000 * 1000;
 
 
 
@@ -82,12 +82,12 @@ export const progress = {
 };
 
 let toast;
-export const setToast = value => {
+export function setToast(value) {
 	toast = value;
 };
 
 let shouldStopNextDefault = false;
-export const stopNextDefault = _ => {
+export function stopNextDefault() {
 	shouldStopNextDefault = true;
 };
 
@@ -95,7 +95,7 @@ let serverURL;
 export const getServerURL = _ => serverURL;
 let newServerURL; // Is a global so it can also be checked against for double sets
 let session;
-export const changeServerURL = value => {
+export function changeServerURL(value) {
 	if (value.endsWith("/")) value = value.slice(0, -1);
 	if (value == serverURL || value == newServerURL) return tasks.check;
 	newServerURL = value;
@@ -150,7 +150,7 @@ export const changeServerURL = value => {
 };
 
 let db, misc, cached, musicIndex;
-export const init = (sessionNeeded = false, specialPage) => {
+export function init(sessionNeeded = false, specialPage) {
 	const promise = (async _ => {
 		const isLoginPage = specialPage == "login";
 		const isInitialSetup = specialPage == "initialSetup";
@@ -265,7 +265,7 @@ export const init = (sessionNeeded = false, specialPage) => {
 	return promise;
 
 };
-export const login = async (password, isSetupCode) => {
+export async function login(password, isSetupCode) {
 	await initIfNeeded(false);
 
 	if (isSetupCode == null) isSetupCode = await request.password.status.set();
@@ -295,17 +295,17 @@ export const login = async (password, isSetupCode) => {
 
 	commandDone();
 };
-export const isSyncNeeded = async _ => {
+export async function isSyncNeeded() {
 	await initIfNeeded();
 
 	return misc.versionStored == -1;
 };
-export const syncIfNeeded = async _ => {
+export async function syncIfNeeded() {
 	await initIfNeeded();
 
 	if (await isSyncNeeded()) await sync()[0];
 };
-export const sync = _ => {
+export function sync() {
 	const anythingToSync = (async _ => {
 		await initIfNeeded();
 
