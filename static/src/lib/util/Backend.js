@@ -1,5 +1,6 @@
 import * as tools from "$util/Tools.js";
 import { openDB } from "idb";
+import { DB_VERSION } from "$util/SharedConstants.js";
 
 export class BackendError extends Error {
 	constructor (name, isRethrow = false) {
@@ -155,7 +156,7 @@ export function init(sessionNeeded = false, specialPage) {
 		const isLoginPage = specialPage == "login";
 		const isInitialSetup = specialPage == "initialSetup";
 
-		db = await openDB("bopfall", 1, {
+		db = await openDB("bopfall", DB_VERSION, {
 			upgrade: async (db, oldVersion, newVersion, transaction) => {
 				db.createObjectStore("files");
 				db.createObjectStore("metadata");

@@ -1,6 +1,8 @@
 import { request } from "$util/Backend.js";
 import { removeNulls } from "$util/Tools.js";
-import { browser } from "$app/environent";
+import { browser } from "$app/environment";
+import { linkPage } from "$util/Tools.js";
+import { PROXY_PREFIX } from "$util/SharedConstants.js";
 
 let swProxyActive;
 function init() {
@@ -18,7 +20,7 @@ export async function play(id) {
 
 	audio = new Audio(audioBlobURL);
 	if (swProxyActive) {
-		audio.src = `bopfall-sw-proxy/track/${id.toString()}`;
+		audio.src = linkPage(`${PROXY_PREFIX}track/${id.toString()}`);
 	}
 	else {
 		const blob = await request.file.getBlob("track/" + id.toString(36));
